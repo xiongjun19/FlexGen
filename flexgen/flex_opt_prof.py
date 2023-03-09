@@ -1342,7 +1342,7 @@ def add_parser_arguments(parser):
     parser.add_argument("--log-file", type=str, default="auto")
     parser.add_argument("--no-log", action="store_true")
     parser.add_argument("--verbose", type=int, default=2)
-
+    parser.add_argument("--cpu_log_path", type=str, default="/tmp/cpu_log.txt")
     parser.add_argument("--overlap", type=str2bool, nargs='?',
         const=True, default=True)
 
