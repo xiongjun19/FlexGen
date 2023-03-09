@@ -25,6 +25,8 @@ from flexgen.utils import (Task, ExecutionEnv, GB, T, ValueHolder,
     torch_mem_stats, torch_dtype_to_np_dtype, write_benchmark_log,
     read_benchmark_log)
 
+from profiler_helper import perf_log
+
 fix_recursive_import()
 
 DUMMY_WEIGHT = "_DUMMY_"  # Use dummy weights for benchmark purposes
@@ -1191,8 +1193,8 @@ def get_test_inputs(prompt_len, num_prompts, tokenizer):
                           max_length=prompt_len).input_ids
     return (input_ids[0],) * num_prompts
 
-
-def prof_collect(inputs, model, gen_len, cpu_log_path):
+@perf_log
+def prof_collect(inputs, model, gen_len):
     p_start()
     print("benchmark - generate")
     for i in range(3):
@@ -1255,7 +1257,8 @@ def run_flexgen(args):
             inputs, max_new_tokens=args.gen_len,
             debug_mode=args.debug_mode, cut_gen_len=cut_gen_len, verbose=args.verbose)
         costs = timers("generate").costs
-        prof_collect(inputs, model, args.gen_len, args.cpu_log_path)
+        prof_collect.set_path(args.cpu_log_path)
+        prof_collect(inputs, model, args.gen_len)
         output_ids = model.generate(
             warmup_inputs, max_new_tokens=1, verbose=args.verbose)
 
