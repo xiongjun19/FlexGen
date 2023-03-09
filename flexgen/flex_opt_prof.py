@@ -1252,7 +1252,7 @@ def run_flexgen(args):
         print("benchmark - generate")
         timers("generate").reset()
         output_ids = model.generate(
-            inputs, max_new_tokens=args.gen_len,
+            warmup_inputs, max_new_tokens=1,
             debug_mode=args.debug_mode, cut_gen_len=cut_gen_len, verbose=args.verbose)
         costs = timers("generate").costs
         prof_collect(inputs, model, args.gen_len, args.cpu_log_path)
