@@ -55,13 +55,16 @@ def perf_log(log_path=None):
             dir_path = os.path.dirname(out_path)
             pre_cmd = 'mkdir -p {0}; nohup sar -buqp  -r ALL -n DEV -P ALL  1 > {1} &'.format(dir_path, out_path)
             exec_cmd(pre_cmd)
-            time.sleep(2)
+            pre_cmd = 'nohup python get_gpu_util.py {0} &'.format(out_path + ".gpu_mem.json")
+            exec_cmd(pre_cmd)
+            time.sleep(1)
             res = func(*args, **kwargs)
-            time.sleep(2)
-
+            time.sleep(1)
             after_cmd = 'ps aux | grep sar | grep buqp | awk \'{print $2}\' | xargs kill -9'
             exec_cmd(after_cmd)
-            time.sleep(2)
+            after_cmd = 'ps aux | grep python | grep get_gpu_util | awk \'{print $2}\' | xargs kill -9'
+            exec_cmd(after_cmd)
+            time.sleep(1)
             return res
 
         @attach_wrapper(wrapper)
