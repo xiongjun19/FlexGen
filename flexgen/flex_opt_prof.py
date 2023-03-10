@@ -1193,7 +1193,7 @@ def get_test_inputs(prompt_len, num_prompts, tokenizer):
                           max_length=prompt_len).input_ids
     return (input_ids[0],) * num_prompts
 
-@perf_log
+@perf_log(log_path=None)
 def prof_collect(inputs, model, gen_len):
     p_start()
     print("benchmark - generate")

@@ -53,13 +53,13 @@ def perf_log(log_path=None):
         @wraps(func)
         def wrapper(*args, **kwargs):
             dir_path = os.path.dirname(out_path)
-            pre_cmd = 'mkdir -p {0}; nohup sar -burqdp  -n DEV -P ALL  1 > {1} &'.format(dir_path, out_path)
+            pre_cmd = 'mkdir -p {0}; nohup sar -buqp  -r ALL -n DEV -P ALL  1 > {1} &'.format(dir_path, out_path)
             exec_cmd(pre_cmd)
             time.sleep(2)
             res = func(*args, **kwargs)
             time.sleep(2)
 
-            after_cmd = 'ps aux | grep sar | grep burqdp | awk \'{print $2}\' | xargs kill -9'
+            after_cmd = 'ps aux | grep sar | grep buqp | awk \'{print $2}\' | xargs kill -9'
             exec_cmd(after_cmd)
             time.sleep(2)
             return res

@@ -7,10 +7,12 @@ mkdir -p ${cpu_logs}
 
 model_prefix="facebook"
 # model_name_arr=("opt-66b" "opt-175b")
-model_name_arr=("opt-66b")
-input_len_arr=(512 1024)
-out_len_arr=(128 256 512 1024)
-bs=4
+model_name_arr=("opt-175b")
+# input_len_arr=(512 1024)
+input_len_arr=(512)
+# out_len_arr=(128 256 512 1024)
+out_len_arr=(2 4 8)
+bs=1
 
 for(( i=0;i<${#model_name_arr[@]};i++)) do
    for(( j=0;j<${#input_len_arr[@]};j++)) do
@@ -21,9 +23,10 @@ for(( i=0;i<${#model_name_arr[@]};i++)) do
 	 out_len=${out_len_arr[k]};
 	 gpu_log="${gpu_logs}/${model_name}_${input_len}_${out_len}.qdrep";
          cpu_log="${cpu_logs}/${model_name}_${input_len}_${out_len}.txt";
-	 cmd="nsys profile  -c cudaProfilerApi -f true --stats true  -o ${prof_log} python flex_opt.py --model ${model_path} --path _DUMMY_  --percent 0 0 0 0 100 0 --gpu-batch-size ${bs} --num-gpu-batches 8  --prompt-len ${input_len} --gen-len ${out_len} --cpu_log_path ${cpu_log} ";
+	 # cmd="nsys profile  -c cudaProfilerApi -f true --stats true  -o ${gpu_log} python flex_opt_prof.py --model ${model_path} --path _DUMMY_  --percent 0 100 100 0 100 0 --gpu-batch-size ${bs} --num-gpu-batches 1  --prompt-len ${input_len} --gen-len ${out_len} --cpu_log_path ${cpu_log} ";
+	 cmd="python flex_opt.py --model ${model_path} --path _DUMMY_  --percent 0 100 100 0 100 0 --gpu-batch-size ${bs} --num-gpu-batches 1  --prompt-len ${input_len} --gen-len ${out_len} ";
 	 echo $cmd; 
-         # cmd;	
+         $cmd;	
 	 echo "done";
       done
     done
