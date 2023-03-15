@@ -1197,7 +1197,7 @@ def get_test_inputs(prompt_len, num_prompts, tokenizer):
 def prof_collect(inputs, model, gen_len):
     p_start()
     print("benchmark - generate")
-    for i in range(2):
+    for i in range(1):
         output_ids = model.generate(
             inputs, max_new_tokens=args.gen_len,
             debug_mode=None, cut_gen_len=None, verbose=args.verbose)
