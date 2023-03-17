@@ -16,12 +16,12 @@ mkdir -p ${cpu_logs}
 
 
 model_prefix="facebook"
-model_name_arr=("opt-175b" "opt-175b")
-input_len_arr=(512 512)
-out_len_arr=(8 8)
-bs_arr=(20 32)
-num_bs_arr=(1 8)
-percent_arr=("0 100 0 100 0 100" "0 100 0 100 0 100")
+model_name_arr=("opt-175b")
+input_len_arr=(512)
+out_len_arr=(8)
+bs_arr=(20)
+num_bs_arr=(1)
+percent_arr=("0 100 0 100 0 100")
 
 
 for(( i=0;i<${#model_name_arr[@]};i++)) do
@@ -35,12 +35,12 @@ for(( i=0;i<${#model_name_arr[@]};i++)) do
    gpu_log="${gpu_logs}/${model_name}_${input_len}_${out_len}_${bs}_${num_bs}.qdrep";
    cpu_log="${cpu_logs}/${model_name}_${input_len}_${out_len}_${bs}_${num_bs}.txt";
    cpu_log_org="${cpu_log}.org";
-   mpirun \
+   mpirun --allow-run-as-root \
      --mca btl_tcp_if_exclude lo,docker0 \
      --mca oob_tcp_if_exclude lo,docker0 \
      --map-by ppr:$N_GPUS:node:pe=$N_CORES_PER_GPU --oversubscribe \
      --bind-to core -x OMP_NUM_THREADS=$N_CORES_PER_GPU \
-     python dist_flex_opt \
+     python dist_flex_opt.py \
        --head-ip 'localhost' \
        --port 7777 \
        --use-mpi \
@@ -53,13 +53,13 @@ for(( i=0;i<${#model_name_arr[@]};i++)) do
        --num-gpu-batches ${num_bs}  --prompt-len ${input_len} --gen-len ${out_len} \
        --log-file ${cpu_log_org};
    echo "start nsys";
-   nsys profile  -c cudaProfilerApi -f true --stats true  -o ${gpu_log} \ 
-     mpirun \
+   nsys profile  -c cudaProfilerApi -f true --stats true  -o ${gpu_log} \
+     mpirun --allow-run-as-root \
           --mca btl_tcp_if_exclude lo,docker0 \
           --mca oob_tcp_if_exclude lo,docker0 \
           --map-by ppr:$N_GPUS:node:pe=$N_CORES_PER_GPU --oversubscribe \
           --bind-to core -x OMP_NUM_THREADS=$N_CORES_PER_GPU \
-          python dist_flex_opt_prof \
+          python dist_flex_opt_prof.py \
             --head-ip 'localhost' \
             --port 7777 \
             --use-mpi \
