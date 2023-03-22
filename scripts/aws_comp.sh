@@ -8,12 +8,14 @@ mkdir -p ${cpu_logs}
 
 
 model_prefix="facebook"
-model_name_arr=("opt-175b")
-input_len_arr=(512)
-out_len_arr=(8)
-bs_arr=(24)
-num_bs_arr=(4)
-percent_arr=("0 100 0 100 0 100")
+# model_name_arr=("opt-175b")
+model_name_arr=("opt-175b" "opt-175b" "opt-175b" "opt-175b")
+input_len_arr=(512 512 512 512)
+out_len_arr=(8 8 8 8)
+bs_arr=(32 32 32 24)
+num_bs_arr=(4 4 4 4)
+# percent_arr=("0 100 0 100 0 100")
+percent_arr=("0 100 0 100 0 100" "0 50 0 100 0 100" "0 50 0 0 0 100" "0 50 0 0 0 100")
 
 for(( i=0;i<${#model_name_arr[@]};i++)) do
    bs=${bs_arr[i]};
@@ -21,7 +23,7 @@ for(( i=0;i<${#model_name_arr[@]};i++)) do
    input_len=${input_len_arr[i]};
    out_len=${out_len_arr[i]};
    model_name=${model_name_arr[i]};
-   percent=${percent_arr[0]};
+   percent=${percent_arr[i]};
    ps=${percent// /:}
    model_path=${model_prefix}/${model_name};
    gpu_log="${gpu_logs}/${model_name}_${input_len}_${out_len}_${bs}_${num_bs}_${ps}_1.qdrep";
