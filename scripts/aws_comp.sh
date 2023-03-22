@@ -10,10 +10,10 @@ mkdir -p ${cpu_logs}
 model_prefix="facebook"
 model_name_arr=("opt-175b")
 input_len_arr=(512)
-out_len_arr=(64)
-bs_arr=(16)
+out_len_arr=(8)
+bs_arr=(24)
 num_bs_arr=(4)
-percent_arr=("0 50 0 100 0 100")
+percent_arr=("0 100 0 100 0 100")
 
 for(( i=0;i<${#model_name_arr[@]};i++)) do
    bs=${bs_arr[i]};
