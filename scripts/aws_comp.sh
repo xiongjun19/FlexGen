@@ -1,5 +1,5 @@
-
-log_dir=/workspace/data/aws_opt_comp_v1
+off_dir_args="--offload-dir /workspace/data/flex_offload_dir"
+log_dir=/workspace/data/aws_opt_comp_v2
 mkdir -p ${log_dir}
 gpu_logs=${log_dir}/gpu_logs
 cpu_logs=${log_dir}/cpu_logs
@@ -12,10 +12,10 @@ model_prefix="facebook"
 model_name_arr=("opt-175b" "opt-175b" "opt-175b" "opt-175b")
 input_len_arr=(512 512 512 512)
 out_len_arr=(8 8 8 8)
-bs_arr=(32 32 32 24)
+bs_arr=(32 32 32 32)
 num_bs_arr=(4 4 4 4)
 # percent_arr=("0 100 0 100 0 100")
-percent_arr=("0 100 0 100 0 100" "0 50 0 100 0 100" "0 50 0 0 0 100" "0 50 0 0 0 100")
+percent_arr=("0 100 0 100 0 100" "0 50 0 100 0 100" "0 50 0 0 0 100" "0 0 0 100 0 100")
 
 for(( i=0;i<${#model_name_arr[@]};i++)) do
    bs=${bs_arr[i]};
@@ -29,7 +29,7 @@ for(( i=0;i<${#model_name_arr[@]};i++)) do
    gpu_log="${gpu_logs}/${model_name}_${input_len}_${out_len}_${bs}_${num_bs}_${ps}_1.qdrep";
    cpu_log="${cpu_logs}/${model_name}_${input_len}_${out_len}_${bs}_${num_bs}_${ps}_1.txt";
    cpu_log_org="${cpu_log}.org";
-   args_str="--model ${model_path} --path _DUMMY_ --pin-weight 0 --percent ${percent} --gpu-batch-size ${bs} --num-gpu-batches ${num_bs}  --prompt-len ${input_len} --gen-len ${out_len}  --compress-weight --compress-cache";
+   args_str="--model ${model_path} ${off_dir_args} --path _DUMMY_ --pin-weight 0 --percent ${percent} --gpu-batch-size ${bs} --num-gpu-batches ${num_bs}  --prompt-len ${input_len} --gen-len ${out_len}  --compress-weight --compress-cache";
    cmd="python flex_opt.py $args_str --log-file ${cpu_log_org}";
    echo $cmd;
    $cmd;
