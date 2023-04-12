@@ -63,7 +63,7 @@ for(( i=0;i<${#model_name_arr[@]};i++)) do
        --path _DUMMY_ \
        --pin-weight 0 \
        --num-gpu-batches ${num_bs}  --prompt-len ${input_len} --gen-len ${out_len} \
-       --log-file ${cpu_log_org} --compress-weight --compress-cache;
+       --log-file ${cpu_log_org} --compress-weight --compress-cache  ${off_dir_args};
    echo "start nsys";
    nsys profile  -c cudaProfilerApi -f true --stats true  -o ${gpu_log} \
      mpirun --allow-run-as-root \
@@ -82,7 +82,7 @@ for(( i=0;i<${#model_name_arr[@]};i++)) do
             --path _DUMMY_ \
             --pin-weight 0 \
             --num-gpu-batches ${num_bs}  --prompt-len ${input_len} --gen-len ${out_len} \
-            --cpu_log_path ${cpu_log} --compress-weight --compress-cache;
+            --cpu_log_path ${cpu_log} --compress-weight --compress-cache ${off_dir_args};
 
    echo "done";
 done
