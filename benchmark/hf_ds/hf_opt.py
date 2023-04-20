@@ -118,6 +118,7 @@ def get_ds_opt_model(model_name, dtype, cpu_offload, disk_offload, offload_dir,
         "steps_per_print": 2000,
         "train_batch_size": args.batch_size,
         "wall_clock_breakdown": False,
+        "tensor_parallel": {"tp_size": WORLD_SIZE},
     }
 
     if cpu_offload:
@@ -249,6 +250,7 @@ def run_generation(model_name, batch_size, prompt_len, gen_len, cut_gen_len,
     execute_gen_len = cut_gen_len if cut_gen_len else gen_len
     if use_deepspeed:
         prompts = ["Paris is the capital city of"] * (batch_size // WORLD_SIZE)
+        # prompts = ["Paris is the capital city of"] * (batch_size)
     else:
         prompts = ["Paris is the capital city of"] * batch_size
     input_ids = tokenizer(prompts, return_tensors="pt",
@@ -261,24 +263,38 @@ def run_generation(model_name, batch_size, prompt_len, gen_len, cut_gen_len,
     with torch.no_grad():
         output_ids = model.generate(input_ids=input_ids, **generate_kwargs_warmup)
 
+    print("get prefill latency: ") 
+    timers("prefill").reset()
+    timers("prefill").start()
+
+    with torch.no_grad():
+        output_ids = model.generate(input_ids=input_ids, **generate_kwargs_warmup)
+
+    timers("prefill").stop()
+    prefill_latency = timers("prefill").costs[0]
+
+
     # Run
     print("benchmark")
     timers("generate-forward").reset()
+    timers("generate-forward").start()
     generate_kwargs = dict(max_new_tokens=execute_gen_len, do_sample=False)
     with torch.no_grad():
         output_ids = model.generate(input_ids=input_ids, **generate_kwargs)
+    timers("generate-forward").stop()
     costs = timers("generate-forward").costs
 
     if use_deepspeed and args.local_rank != 0:
         return
 
     # Log output
-    prefill_latency = costs[0]
+    # prefill_latency = costs[0]
     prefill_throughput = batch_size * prompt_len / prefill_latency
-    if cut_gen_len:  # project latency of cut_gen_len to gen_len
-        decode_latency = project_decode_latency(costs, prompt_len, gen_len)
-    else:
-        decode_latency = sum(costs[1:])
+    decode_latency = costs[0] - prefill_latency
+    # if cut_gen_len:  # project latency of cut_gen_len to gen_len
+    #     decode_latency = project_decode_latency(costs, prompt_len, gen_len)
+    # else:
+    #     decode_latency = sum(costs[1:])
     decode_throughput = batch_size * (gen_len - 1) / max(decode_latency, 1e-10)
     num_generated_tokens = batch_size * gen_len
     total_latency = prefill_latency + decode_latency
