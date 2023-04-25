@@ -26,13 +26,13 @@ for(( i=0;i<${#model_name_arr[@]};i++)) do
    cpu_log="${cpu_logs}/${model_name}_${input_len}_${out_len}_${bs}_${num_bs}_${ps}_0_${num_gpu}.txt";
    cpu_log_org="${cpu_log}.org";
    cmd_pre="deepspeed --num_nodes 1 --num_gpus ${num_gpu} --master_port 7778"
-   args_str="--model ${model_path} ${off_dir_args} --dummy --cpu --batch-size ${bs}  --prompt-len ${input_len} --gen-len ${out_len} ";
+   args_str="--model ${model_path} ${off_dir_args} --dummy --cpu-offload --batch-size ${bs}  --prompt-len ${input_len} --gen-len ${out_len} ";
    cmd="${cmd_pre} hf_opt.py $args_str --log-file ${cpu_log_org}";
    echo $cmd;
-   # $cmd;
+   $cmd;
    cmd="nsys profile  -c cudaProfilerApi -f true --stats true  -o ${gpu_log} ${cmd_pre} hf_opt_prof.py $args_str --cpu_log_path ${cpu_log}";
    echo $cmd;
-   # $cmd;
+   $cmd;
    echo "done";
 done
 
