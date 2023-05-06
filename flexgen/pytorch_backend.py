@@ -892,6 +892,9 @@ def copy_worker_func(queue, cuda_id):
             dst, dst_indices, src, src_indices = item
             src_data = map_to_torch_tensor(src, src_indices)
             dst_data = map_to_torch_tensor(dst, dst_indices)
+            op = 'read' if src.device.device_type == DeviceType.CUDA else 'write'
+            size = np.prod(src_data.shape)
+            print(f"{op}% from (or To) Disk, the size is: {size}")
 
             if (src.device.device_type == DeviceType.CUDA or
                 dst.device.device_type == DeviceType.CUDA):
