@@ -1,4 +1,3 @@
-# coding=utf8
 
 import json
 
@@ -11,8 +10,14 @@ def do_parse(f_path, out_path):
 def _parse_mem(f_path):
     start = False
     res_dict = {}
-    with open(f_path) as in_:
+    print("path name is: ", f_path)
+    with open(f_path, 'rb') as in_:
         for line in in_:
+            try:
+                line = line.decode('utf-8')
+            except:
+                print('invalid value')
+                continue
             line = line.strip()
             if "benchmark - generate" in line:
                 start = True
@@ -42,22 +47,6 @@ def _append_to_dict(_dict, key, val):
     if key not in _dict:
         _dict[key] = []
     _dict[key].append(val)
-
-
-def exec_query(cursor, sql):
-    cursor.execute(sql)
-    return cursor.fetchall()
-
-
-def exec_and_parse(cursor, sql):
-    try:
-        cursor.execute(sql)
-        items = cursor.fetchall()
-
-        return items
-    except sqlite3.OperationalError as e:
-        print(e)
-        return None
 
 
 def test(f_path, o_path):
