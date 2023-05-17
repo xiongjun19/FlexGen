@@ -1,6 +1,9 @@
 # coding=utf8
 
+import argparse
+import json
 import flask
+from flask import request
 import hf_infer
 
 app = flask.Flask(__name__)

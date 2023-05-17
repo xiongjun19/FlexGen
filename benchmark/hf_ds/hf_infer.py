@@ -22,25 +22,18 @@ from flexgen.opt_config import (get_opt_config,
 
 class Infer(object):
     def __init__(self, args):
-            '''
-            args.model, args.batch_size, args.prompt_len, args.gen_len,
-            args.cut_gen_len, args.cpu_offload, args.disk_offload,
-            os.path.abspath(os.path.expanduser(args.offload_dir)),
-            args.int8, num_nodes, num_gpus_per_node, use_deepspeed,
-            args.dummy, args.log_file, args.pkl_file,
-            args.no_log, args.verbose
-            '''
         self.model_name = args.model
         self.local_rank = args.local_rank
         self.tokenizer = AutoTokenizer.from_pretrained(
                 self.model_name.replace("175b", "66b"), padding_side="left")
         self.offload_dir = os.path.abspath(os.path.expanduser(args.offload_dir))
         dtype=torch.float16
+        self.args = args
         if args.int8:
             dtype=torch.int8
         dummy_weights = None
-        self.model = get_ds_opt_model(model_name, dtype, args.cpu_offload, args.disk_offload,
-            self.offload_dir, dummy_weights)
+        self.model = get_ds_opt_model(self.model_name, dtype, args.cpu_offload, args.disk_offload,
+            self.offload_dir, dummy_weights, args)
 
         prompts = ["Paris is the capital city of"]
         input_ids = self.tokenizer(
@@ -51,11 +44,11 @@ class Infer(object):
             self.model.generate(input_ids=input_ids, **generate_kwargs_warmup)
 
     def run(self, prompts, gen_len=64):
-        input_ids =  self.tokenizer(prompts, return_tensor='pt').input_ids.cuda()
+        input_ids =  self.tokenizer(prompts, return_tensors='pt').input_ids.cuda()
         generate_kwargs = dict(max_new_tokens=gen_len, do_sample=False)
         with torch.no_grad():
-            output_ids = model.generate(input_ids=input_ids, **generate_kwargs)
-            if args.local_rank > 0:
+            output_ids = self.model.generate(input_ids=input_ids, **generate_kwargs)
+            if self.args.local_rank > 0:
                 return output_ids
             outputs = self.tokenizer.batch_decode(output_ids, skip_special_tokens=True)
             return outputs
@@ -107,7 +100,7 @@ def get_model_config(model_name):
 
 
 def get_ds_opt_model(model_name, dtype, cpu_offload, disk_offload, offload_dir,
-                     dummy_weights):
+                     dummy_weights, args):
     import deepspeed
     import torch.distributed as dist
     from transformers.deepspeed import HfDeepSpeedConfig
@@ -116,7 +109,7 @@ def get_ds_opt_model(model_name, dtype, cpu_offload, disk_offload, offload_dir,
     hidden_size = config.hidden_size
     deepspeed.init_distributed("nccl")
     rank = dist.get_rank()
-    pin_memory = bool(args.pin_memory)
+    pin_memory = True 
 
     ds_config = {
         "fp16": {
@@ -133,7 +126,7 @@ def get_ds_opt_model(model_name, dtype, cpu_offload, disk_offload, offload_dir,
         "steps_per_print": 2000,
         "train_batch_size": args.batch_size,
         "wall_clock_breakdown": False,
-        "tensor_parallel": {"tp_size": WORLD_SIZE},
+        # "tensor_parallel": {"tp_size": WORLD_SIZE},
     }
 
     if cpu_offload:
