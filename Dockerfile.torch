@@ -4,11 +4,17 @@ ARG BASE_IMAGE=nvcr.io/nvidia/pytorch:${DOCKER_VERSION}-py3
 FROM ${BASE_IMAGE}
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends bc git-lfs&& \
+    apt-get install -y --no-install-recommends bc git-lfs && \
+    apt-get install -y libaio-dev && \
+    apt-get install -y sysstat && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-RUN apt-get update && apt-get install -y sysstat
 RUN python -m pip install --upgrade pip
 RUN pip install gpustats
 RUN pip install openpyxl
+RUN pip install pydantic --upgrade
+RUN pip install deepspeed==0.9.2
+RUN pip install accelerate==0.19.0
+RUN pip install mpi4py==3.1.4
+RUN pip install flask 
