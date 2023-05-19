@@ -45,7 +45,7 @@ class Infer(object):
 
     def run(self, prompts, gen_len=64):
         input_ids =  self.tokenizer(prompts, return_tensors='pt').input_ids.cuda()
-        generate_kwargs = dict(max_new_tokens=gen_len, do_sample=False)
+        generate_kwargs = dict(max_new_tokens=gen_len, do_sample=True)
         with torch.no_grad():
             output_ids = self.model.generate(input_ids=input_ids, **generate_kwargs)
             if self.args.local_rank > 0:
