@@ -15,6 +15,7 @@ import pickle
 import time
 
 import numpy as np
+import mpu
 
 from accelerate import (infer_auto_device_map, init_empty_weights,
     load_checkpoint_and_dispatch)
@@ -146,7 +147,7 @@ def get_ds_opt_model(model_name, dtype, cpu_offload, disk_offload, offload_dir,
     model = OPTForCausalLM.from_pretrained(
         dummy_weights or model_name, torch_dtype=dtype)
     model = model.eval()
-    ds_engine = deepspeed.initialize(model=model, config_params=ds_config)[0]
+    ds_engine = deepspeed.initialize(model=model, config_params=ds_config, mpu=mpu)[0]
     ds_engine.module.eval()
     model = ds_engine.module
 
