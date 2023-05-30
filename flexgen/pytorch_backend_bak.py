@@ -1,3 +1,4 @@
+"""Implement tensor computations with pytorch."""
 from enum import Enum, auto
 from functools import partial
 from itertools import count
@@ -10,8 +11,6 @@ from typing import Optional, Union, Tuple
 
 import torch
 import torch.nn.functional as F
-import torch.nn as nn
-import torch.nn.parallel
 import numpy as np
 
 from flexgen.utils import (GB, T, cpu_mem_stats, vector_gather,
@@ -28,43 +27,6 @@ def fix_recursive_import():
     from flexgen import compression
     general_copy_compressed = compression.general_copy_compressed
     TorchCompressedDevice = compression.TorchCompressedDevice
-
-class MlpTpModule(nn.Module):
-    def __init__(self):
-        super(MlpTpModule, self).__init__()
-        self.fc1_weight = None
-        self.fc1_bias   = None
-        self.fc2_weight = None
-
-    def forward(self, input):
-        out = F.linear(input, self.fc1_weight, self.fc1_bias)
-        out = F.relu(out, inplace=True)
-        return  F.linear(out, self.fc2_weight)
-
-class MhaFcTpModule(nn.Module):
-    def __init__(self):
-        super(MhaFcTpModule, self).__init__()
-        self.fc_weight  = None
-
-    def forward(self, input):
-        return F.linear(input, self.fc_weight)
-
-class MhaQkvTpModule(nn.Module):
-    def __init__(self):
-        super(MhaQkvTpModule, self).__init__()
-        self.q_weight  = None
-        self.q_bias    = None
-        self.k_weight  = None
-        self.k_bias    = None
-        self.v_weight  = None
-        self.v_bias    = None
-        self.scaling   = 0
-
-    def forward(self, input):
-        q = F.linear(input, self.q_weight, bias=self.q_bias) * self.scaling
-        k = F.linear(input, self.k_weight, bias=self.k_bias)
-        v = F.linear(input, self.v_weight, bias=self.v_bias)
-        return q, k, v
 
 
 class DeviceType(Enum):
@@ -197,7 +159,7 @@ class TorchTensor:
 class TorchDevice:
     """Wrap tensor and computation APIs of a single CPU or GPU."""
 
-    def __init__(self, name, tp_num=1, mem_capacity=None, flops=None):
+    def __init__(self, name, mem_capacity=None, flops=None):
         self.name = name
         self.mem_capacity = mem_capacity
         self.flops = flops
@@ -205,12 +167,6 @@ class TorchDevice:
         self.dev = torch.device(name)
         self.device_type = DeviceType.convert(self.dev.type)
         self.compressed_device = TorchCompressedDevice(self)
-
-        self.tp_num         = tp_num
-        self.mlp_tp_mod     = MlpTpModule().cuda()
-        self.mha_qkv_tp_mod = MhaQkvTpModule().cuda()
-        self.mha_fc_tp_mod  = MhaFcTpModule().cuda()
-        self.gpu_devices = [i for i in range(self.tp_num)]
 
         self.links = {}
 
@@ -249,7 +205,7 @@ class TorchDevice:
             self.attention_compute_workspace = []
             self.workspace_pt = 0
 
-            # We currenly separate SelfAttention and MLP as two layers,
+            # We currently separate SelfAttention and MLP as two layers,
             # so we only need one workspace instead of two.
             for i in range(1 if policy.sep_layer else 2):
                 shape = (max_seq_len, b * n_head, head_dim)
@@ -321,7 +277,7 @@ class TorchDevice:
         logits = F.linear(hidden, w_token.data)
         last_token_logits = logits[:,-1,:]
 
-        if do_sample:
+        if do_sample and not temperature < 1e-5:
             probs = torch.softmax(last_token_logits / temperature, dim=-1)
             ids = torch.multinomial(probs, num_samples=1)
         else:
@@ -355,37 +311,10 @@ class TorchDevice:
 
         hidden = F.layer_norm(inputs.data, (h,), weight=w_ln.data, bias=b_ln.data)
 
-        #attention的qkv, 列切
-        w_q_data_chunks = nn.parallel.scatter(w_q.data, self.gpu_devices, dim=0)
-        w_k_data_chunks = nn.parallel.scatter(w_k.data, self.gpu_devices, dim=0)
-        w_v_data_chunks = nn.parallel.scatter(w_v.data, self.gpu_devices, dim=0)
-        b_q_data_chunks = nn.parallel.scatter(b_q.data, self.gpu_devices, dim=0)
-        b_k_data_chunks = nn.parallel.scatter(b_k.data, self.gpu_devices, dim=0)
-        b_v_data_chunks = nn.parallel.scatter(b_v.data, self.gpu_devices, dim=0)
-        #hidden_data 不切割, 广播
-        hidden_datas = nn.parallel.comm.broadcast(hidden, self.gpu_devices)
-
-        # 复制模型副本到多个设备
-        replicas = nn.parallel.replicate(self.mha_qkv_tp_mod, self.gpu_devices)
-        for i in self.gpu_devices:#权重切片到各自模型中
-            replicas[i].scaling   = scaling
-            replicas[i].q_weight  = w_q_data_chunks[i]
-            replicas[i].q_bias    = b_q_data_chunks[i]
-            replicas[i].k_weight  = w_k_data_chunks[i]
-            replicas[i].k_bias    = b_k_data_chunks[i]
-            replicas[i].v_weight  = w_v_data_chunks[i]
-            replicas[i].v_bias    = b_v_data_chunks[i]
-
-        outputs = nn.parallel.parallel_apply(replicas, hidden_datas)
-
-        q_results = [o[0] for o in outputs]
-        k_results = [o[1] for o in outputs]
-        v_results = [o[2] for o in outputs]
-
-        q     = nn.parallel.gather(q_results, 0, dim = 2)
-        k     = nn.parallel.gather(k_results, 0, dim = 2)
-        v     = nn.parallel.gather(v_results, 0, dim = 2)
-
+        # shape: (b, s, h)
+        q = F.linear(hidden, w_q.data, bias=b_q.data) * scaling
+        k = F.linear(hidden, w_k.data, bias=b_k.data)
+        v = F.linear(hidden, w_v.data, bias=b_v.data)
         # shape: (b, s, n_head, head_dim)
         q = q.view(b, s, n_head, head_dim)
         k = k.view(b, s, n_head, head_dim)
@@ -415,24 +344,13 @@ class TorchDevice:
         value = torch.bmm(attn_weights, v).view(b, n_head, s, head_dim)
         # shape: (b, s, h)
         value = value.transpose(1, 2).reshape(b, s, h)
-
-
-        value_chunks = nn.parallel.scatter(value, self.gpu_devices, dim=2)
-        #attention的qkv, 列切
-        w_out_data_chunks = nn.parallel.scatter(w_out.data, self.gpu_devices, dim=1)
-
-        replicas = nn.parallel.replicate(self.mha_fc_tp_mod, self.gpu_devices)
-        for i in self.gpu_devices:
-            replicas[i].fc_weight = w_out_data_chunks[i]
-
-        outputs = nn.parallel.parallel_apply(replicas, value_chunks)
-        value = nn.parallel.comm.reduce_add(outputs, 0) + b_out.data
-
+        value = F.linear(value, w_out.data, bias=b_out.data)
 
         value.add_(inputs.data)
 
         if donate[0]: inputs.delete()
         if donate[1]: attention_mask.delete()
+
         # (s, b * n_head, head_dim)
         k = k.permute(2, 0, 1)
         v = v.permute(1, 0, 2)
@@ -465,41 +383,9 @@ class TorchDevice:
         hidden = F.layer_norm(inputs.data, (h,), weight=w_ln.data, bias=b_ln.data)
 
         # shape: (b, 1, h)
-        #q = F.linear(hidden, w_q.data, bias=b_q.data) * scaling
-        #k = F.linear(hidden, w_k.data, bias=b_k.data)
-        #v = F.linear(hidden, w_v.data, bias=b_v.data)
-
-        #attention的qkv, 列切
-        w_q_data_chunks = nn.parallel.scatter(w_q.data, self.gpu_devices, dim=0)
-        w_k_data_chunks = nn.parallel.scatter(w_k.data, self.gpu_devices, dim=0)
-        w_v_data_chunks = nn.parallel.scatter(w_v.data, self.gpu_devices, dim=0)
-        b_q_data_chunks = nn.parallel.scatter(b_q.data, self.gpu_devices, dim=0)
-        b_k_data_chunks = nn.parallel.scatter(b_k.data, self.gpu_devices, dim=0)
-        b_v_data_chunks = nn.parallel.scatter(b_v.data, self.gpu_devices, dim=0)
-        #hidden_data 不切割, 广播
-        hidden_datas = nn.parallel.comm.broadcast(hidden, self.gpu_devices)
-
-        # 复制模型副本到多个设备
-        replicas = nn.parallel.replicate(self.mha_qkv_tp_mod, self.gpu_devices)
-        for i in self.gpu_devices:#权重切片到各自模型中
-            replicas[i].scaling   = scaling
-            replicas[i].q_weight  = w_q_data_chunks[i]
-            replicas[i].q_bias    = b_q_data_chunks[i]
-            replicas[i].k_weight  = w_k_data_chunks[i]
-            replicas[i].k_bias    = b_k_data_chunks[i]
-            replicas[i].v_weight  = w_v_data_chunks[i]
-            replicas[i].v_bias    = b_v_data_chunks[i]
-
-        outputs = nn.parallel.parallel_apply(replicas, hidden_datas)
-
-        q_results = [o[0] for o in outputs]
-        k_results = [o[1] for o in outputs]
-        v_results = [o[2] for o in outputs]
-
-        q     = nn.parallel.gather(q_results, 0, dim = 2)
-        k     = nn.parallel.gather(k_results, 0, dim = 2)
-        v     = nn.parallel.gather(v_results, 0, dim = 2)
-
+        q = F.linear(hidden, w_q.data, bias=b_q.data) * scaling
+        k = F.linear(hidden, w_k.data, bias=b_k.data)
+        v = F.linear(hidden, w_v.data, bias=b_v.data)
         # shape: (b, 1, n_head, head_dim)
         q = q.view(b, tgt_s, n_head, head_dim)
         k = k.view(b, tgt_s, n_head, head_dim)
@@ -562,17 +448,7 @@ class TorchDevice:
 
         # shape: (b, 1, h)
         value = value.transpose(1, 2).view(b, tgt_s, h)
-
-        value_chunks = nn.parallel.scatter(value, self.gpu_devices, dim=2)
-        #attention的qkv, 列切
-        w_out_data_chunks = nn.parallel.scatter(w_out.data, self.gpu_devices, dim=1)
-
-        replicas = nn.parallel.replicate(self.mha_fc_tp_mod, self.gpu_devices)
-        for i in self.gpu_devices:
-            replicas[i].fc_weight = w_out_data_chunks[i]
-
-        outputs = nn.parallel.parallel_apply(replicas, value_chunks)
-        value = nn.parallel.comm.reduce_add(outputs, 0) + b_out.data
+        value = F.linear(value, w_out.data, bias=b_out.data)
 
         value.add_(inputs.data)
 
@@ -697,24 +573,11 @@ class TorchDevice:
             wo = wo.device.decompress(wo)
 
         b, s, h = inputs.shape
+
         out = F.layer_norm(inputs.data, (h,), weight=w_ln.data, bias=b_ln.data)
-
-        out_datas = nn.parallel.comm.broadcast(out, self.gpu_devices)
-        wi_data_chunks = nn.parallel.scatter(wi.data, self.gpu_devices, dim=0)#列切
-        bi_data_chunks = nn.parallel.scatter(bi.data, self.gpu_devices, dim=0)
-        wo_data_chunks = nn.parallel.scatter(wo.data, self.gpu_devices, dim=1)#行切
-
-        # 复制模型副本到多个设备
-        replicas = nn.parallel.replicate(self.mlp_tp_mod, self.gpu_devices)
-        for i in self.gpu_devices:#权重切片到各自模型中
-            replicas[i].fc1_weight = wi_data_chunks[i]
-            replicas[i].fc1_bias   = bi_data_chunks[i]
-            replicas[i].fc2_weight = wo_data_chunks[i]
-
-        # 在每个设备上执行线性变换并汇总输出
-        outputs = nn.parallel.parallel_apply(replicas, out_datas)
-        # 汇总输出结果reduce sum
-        out = nn.parallel.comm.reduce_add(outputs, 0) +  bo.data
+        out = F.linear(out, wi.data, bias=bi.data)
+        F.relu(out, inplace=True)
+        out = F.linear(out, wo.data, bias=bo.data)
 
         out.add_(inputs.data)
         if donate[0]: inputs.delete()
@@ -1029,6 +892,9 @@ def copy_worker_func(queue, cuda_id):
             dst, dst_indices, src, src_indices = item
             src_data = map_to_torch_tensor(src, src_indices)
             dst_data = map_to_torch_tensor(dst, dst_indices)
+            op = 'read' if src.device.device_type == DeviceType.CUDA else 'write'
+            size = np.prod(src_data.shape)
+            print(f"{op}% from (or To) Disk, the size is: {size}")
 
             if (src.device.device_type == DeviceType.CUDA or
                 dst.device.device_type == DeviceType.CUDA):
