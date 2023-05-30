@@ -115,10 +115,11 @@ def get_ds_opt_model(model_name, dtype, cpu_offload, disk_offload, offload_dir,
             "stage3_prefetch_bucket_size": hidden_size * hidden_size,
             "stage3_param_persistence_threshold": 0,
         },
-        "steps_per_print": 2000,
-        "train_batch_size": args.batch_size,
-        "wall_clock_breakdown": False,
+        #"steps_per_print": 2000,
+        #"train_batch_size": args.batch_size,
+        #"wall_clock_breakdown": False,
         "tensor_parallel": {"tp_size": WORLD_SIZE},
+        "train_micro_batch_size_per_gpu": 1,
     }
 
     if cpu_offload:
