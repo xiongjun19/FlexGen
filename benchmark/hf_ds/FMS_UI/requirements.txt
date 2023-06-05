@@ -1,0 +1,6 @@
+gradio==3.22.0
+transformers
+markdown2
+pypinyin
+tiktoken
+mdtex2html

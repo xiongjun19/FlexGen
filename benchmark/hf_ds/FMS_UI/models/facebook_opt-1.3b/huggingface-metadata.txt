@@ -1,0 +1,5 @@
+url: https://huggingface.co/facebook/opt-1.3b
+branch: main
+download date: 2023-04-10 09:12:29
+sha256sum:
+    cf7d5c970d6ddbd3b03009b397c0422e147edd5c8020d47a8d2fac0b11a3b08d pytorch_model.bin
