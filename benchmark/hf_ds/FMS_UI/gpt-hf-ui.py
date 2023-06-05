@@ -1,6 +1,6 @@
 # -*- coding:utf-8 -*-
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "0" # normal 
+os.environ["CUDA_VISIBLE_DEVICES"] = "1" # normal 
 import logging
 import sys
 import gradio as gr
@@ -18,7 +18,7 @@ import multiprocessing as mp
 import os
 import pickle
 import time
-
+import random
 import numpy as np
 
 from accelerate import (infer_auto_device_map, init_empty_weights,
@@ -26,7 +26,8 @@ from accelerate import (infer_auto_device_map, init_empty_weights,
 from transformers import AutoTokenizer, AutoConfig, AutoModelForCausalLM
 from transformers import OPTForCausalLM
 import torch
-
+random.seed(42) 
+torch.manual_seed(42)
 from flexgen.timer import timers
 from flexgen.utils import (GB, project_decode_latency,
     write_benchmark_log)
@@ -35,23 +36,69 @@ from flexgen.opt_config import (get_opt_config,
 
 
 
+
+
+
+
 logging.basicConfig(
     level=logging.DEBUG,
     format="%(asctime)s [%(levelname)s] [%(filename)s:%(lineno)d] %(message)s",
 )
 
-# model_name = "facebook_opt-1.3b"
-# model_path = f"models/{model_name}/"
+model_name = "facebook_opt-1.3b"
+# model_name = "facebook_opt-350m"
+model_path = f"models/{model_name}/"
+
 # tokenizer,model,device = load_tokenizer_and_model(base_model,adapter_model)
 device = 'cuda'
 
 use_cuda=True
+
+def log_time(st):
+    print(f'\033[36mtook {round(time.time()-st,3)}s\033[0m')  
+    return time.time()  
+
+def log_message(text, color):
+    print(f'{color}{text}\033[0m')
 
 def get_context(model_path):
     with open(f"{model_path}/conversation.txt", "r") as f:
         conversation = f.readlines()
     conversation_string = "".join(conversation)
     return conversation_string
+
+def load_gpt_model(model_path, mem_type):
+    model_file = os.path.join(model_path, 'pytorch_model.bin')
+    log_message(f'\nGPT model: {model_name}', '\033[37m')
+    # Determine the length of the file
+    file_size = os.stat(model_file).st_size
+    log_message(f'Model weights size: {round(file_size/1024**3,4)} GB', '\033[37m')
+    # Open the file and map it to memory
+    with open(model_file, 'rb') as file:
+        with mmap.mmap(-1, length=file_size, flags=mmap.MAP_PRIVATE | mmap.MAP_ANONYMOUS, prot=mmap.PROT_READ | mmap.PROT_WRITE) as mmap_obj:
+            log_message(f'Loading weights from Disk to {mem_type} memory...', '\033[37m')
+            st = time.time()
+            mmap_obj.write(file.read())
+            st = log_time(st)
+            log_message(f'Extracting data from {mem_type} memory...','\033[37m')
+            model_data = mmap_obj[:file_size]
+            st = log_time(st)
+            log_message('Loading the model state dictionary from the extracted data...','\033[37m')
+            model_state_dict = torch.load(_io.BytesIO(model_data), map_location=torch.device('cpu'))
+            st = log_time(st)
+            log_message('Initializing the model with loaded state dictionary...','\033[37m')
+            model = AutoModelForCausalLM.from_pretrained(model_path, state_dict=model_state_dict)
+            st = log_time(st)
+            log_message('Evaluation mode starting...','\033[37m')
+            if use_cuda:
+                model.to('cuda')
+            else:
+                model.eval()
+            st = log_time(st)
+            print(f'\n\033[35m==== Chat Session via {mem_type} Memory ====\033[0m\n')
+            return model
+
+
 
 class Infer(object):
     def __init__(self, args):
@@ -369,13 +416,23 @@ if __name__ == "__main__":
   
     
     ## Hugging Face Inference
+    # using local with mmap
     # model = load_gpt_model(model_path, 'mem_type')
     # tokenizer = AutoTokenizer.from_pretrained(model_path, padding_side="left")
+    
+    ## Using .cache
+    # model = AutoModelForCausalLM.from_pretrained(args.model, device_map="auto")
+    # tokenizer = AutoTokenizer.from_pretrained(args.model, use_fast=False)
+    
     
     ## Flexgen Inference
     hf_infer = Infer(args)
     model = hf_infer.model
     tokenizer = hf_infer.tokenizer
+    
+    
+    
+    
     total_count = 0
     
     gr.Chatbot.postprocess = postprocess
@@ -518,5 +575,5 @@ if __name__ == "__main__":
 
 
     demo.title = "LT-Chat"
-    demo.queue(concurrency_count=1).launch(server_port=9808,server_name='localhost',share=False)
+    demo.queue(concurrency_count=1).launch(server_port=9808,server_name='10.102.128.22',share=True)
     # demo.queue(concurrency_count=1).launch(server_port=9808,server_name='10.102.128.22',share=True)
