@@ -2,7 +2,7 @@
 import gradio as gr
 
 
-title = """<h1 align="left" style="min-width:200px; margin-top:0;"> <img src="https://mma.prnewswire.com/media/1709966/Lightelligence_logo.jpg" width="180px" style="display: inline"> Powered by Protowave! </h1>"""
+title = """<h1 align="left" style="min-width:200px; margin-top:0;"> <img src="file/assets/Lightelligence_Final_Logo-transparentBG.png" width="180px" style="display: inline"> Powered by Protowave! </h1>"""
 description_top = """\
 <div align="left">
 <p>
