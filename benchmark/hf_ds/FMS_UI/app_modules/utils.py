@@ -29,6 +29,16 @@ from transformers import GenerationConfig, LlamaForCausalLM, LlamaTokenizer
 
 from app_modules.presets import *
 
+import torch
+import transformers
+import gc
+from typing import Iterator
+import torch
+import torch.nn.functional as F
+import transformers
+import random
+from typing import Iterator
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] [%(filename)s:%(lineno)d] %(message)s",
@@ -290,6 +300,94 @@ def greedy_search(input_ids: torch.Tensor,
                 del probs_sum
                 gc.collect()
                 return 
+            
+
+
+def random_sampling(input_ids: torch.Tensor,
+                    model: torch.nn.Module,
+                    tokenizer: transformers.PreTrainedTokenizer,
+                    stop_words: list,
+                    max_length: int,
+                    temperature: float = 1.0,
+                    top_p: Any=None) -> Iterator[str]:
+    generated_tokens = []
+    past_key_values = None
+
+    for i in range(max_length):
+        with torch.no_grad():
+            if past_key_values is None:
+                outputs = model(input_ids)
+            else:
+                outputs = model(input_ids[:, -1:], past_key_values=past_key_values)
+            logits = outputs.logits[:, -1, :]
+            past_key_values = outputs.past_key_values
+
+            # apply temperature
+            logits /= temperature
+
+            probs = F.softmax(logits, dim=-1)
+            next_token = torch.multinomial(probs, num_samples=1)
+
+            input_ids = torch.cat((input_ids, next_token), dim=-1)
+
+            generated_tokens.append(next_token.item())
+            text = tokenizer.decode(generated_tokens)
+            yield text
+            if any([x in text for x in stop_words]):
+                del past_key_values
+                del logits
+                del probs
+                gc.collect()
+                return
+
+
+
+def top_k_sampling(input_ids: torch.Tensor,
+                   model: torch.nn.Module,
+                   tokenizer: transformers.PreTrainedTokenizer,
+                   stop_words: list,
+                   max_length: int,
+                   k: int = 10,
+                   temperature: float = 1.0,
+                   top_p:Any =None) -> Iterator[str]:
+    generated_tokens = []
+    past_key_values = None
+
+    for i in range(max_length):
+        with torch.no_grad():
+            if past_key_values is None:
+                outputs = model(input_ids)
+            else:
+                outputs = model(input_ids[:, -1:], past_key_values=past_key_values)
+            logits = outputs.logits[:, -1, :]
+            past_key_values = outputs.past_key_values
+
+            # apply temperature
+            logits /= temperature
+
+            probs = F.softmax(logits, dim=-1)
+            sorted_probs, sorted_indices = torch.sort(probs, descending=True)
+            cumulative_probs = torch.cumsum(sorted_probs, dim=-1)
+            mask = cumulative_probs > cumulative_probs[:, k-1:k]
+            sorted_probs[mask] = 0.0
+            sorted_probs /= sorted_probs.sum(dim=-1, keepdim=True)
+
+            next_token = torch.multinomial(sorted_probs, num_samples=1)
+            next_token = torch.gather(sorted_indices, -1, next_token)
+
+            input_ids = torch.cat((input_ids, next_token), dim=-1)
+
+            generated_tokens.append(next_token.item())
+            text = tokenizer.decode(generated_tokens)
+            yield text
+            if any([x in text for x in stop_words]):
+                del past_key_values
+                del logits
+                del probs
+                gc.collect()
+                return
+
+
 def get_context(model_path):
     with open(f"{model_path}/conversation.txt", "r") as f:
         conversation = f.readlines()

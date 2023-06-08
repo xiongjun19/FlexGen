@@ -1,33 +1,37 @@
 # -*- coding:utf-8 -*-
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "1" # normal 
+# os.environ["CUDA_VISIBLE_DEVICES"] = "0" # normal 
+os.environ["TOKENIZERS_PARALLELISM"] = "true"
+
+import torch
+import random
+random.seed(42) 
+torch.manual_seed(42)
+torch.cuda.current_device()
 import logging
 import sys
 import gradio as gr
-import torch
 import gc
 from app_modules.utils import *
 from app_modules.presets import *
 from app_modules.overwrites import *
 import mmap, time, _io
 from transformers import AutoTokenizer, AutoModelForCausalLM
-import pycuda.driver as cuda
 
 import argparse
 import multiprocessing as mp
 import os
 import pickle
 import time
-import random
+
 import numpy as np
 
-from accelerate import (infer_auto_device_map, init_empty_weights,
-    load_checkpoint_and_dispatch)
+# from accelerate import (infer_auto_device_map, init_empty_weights,
+#     load_checkpoint_and_dispatch)
 from transformers import AutoTokenizer, AutoConfig, AutoModelForCausalLM
 from transformers import OPTForCausalLM
-import torch
-random.seed(42) 
-torch.manual_seed(42)
+
+
 from flexgen.timer import timers
 from flexgen.utils import (GB, project_decode_latency,
     write_benchmark_log)
@@ -363,7 +367,8 @@ def predict(text,
         Decode throughput: {tokens_per_second} tokens/seconds, \
         \nModel: {args.model} \
         \nCPU Offload: {args.cpu_offload}, Disk Offload: {args.disk_offload} \
-        \nGPU Type: {torch.cuda.get_device_name(device=None)}, GPUs Used: {args.num_gpus}, Pin Memory: {1==int(args.pin_memory)}"
+        \nGPU Type: {torch.cuda.get_device_name(device=None)}, GPUs Used: {args.num_gpus}, Pin Memory: {1==int(args.pin_memory)} \
+        \nMemory Type: {args.mem_type}"
         
     except:
         pass
@@ -411,6 +416,8 @@ if __name__ == "__main__":
     parser.add_argument("--pkl-file", type=str, default="auto")
     parser.add_argument("--no-log", action="store_true")
     parser.add_argument("--verbose", type=int, default=2)
+    parser.add_argument("--mem-type", type=str, default="normal")
+    
     global args
     args = parser.parse_args()
   
@@ -575,5 +582,5 @@ if __name__ == "__main__":
 
 
     demo.title = "LT-Chat"
-    demo.queue(concurrency_count=1).launch(server_port=9808,server_name='10.102.128.22',share=True)
+    demo.queue(concurrency_count=1).launch(server_port=9808,server_name='10.1.5.46',share=True)
     # demo.queue(concurrency_count=1).launch(server_port=9808,server_name='10.102.128.22',share=True)
