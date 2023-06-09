@@ -18,7 +18,7 @@ from transformers import AutoTokenizer
 from flexgen.compression import CompressionConfig
 from flexgen.opt_config import OptConfig, get_opt_config, download_opt_weights
 from flexgen.pytorch_backend import (TorchDevice, TorchDisk, TorchLink,
-    TorchMixedDevice, DeviceType, general_copy, fix_recursive_import)
+    TorchMixedDevice, TorchTPDevice, DeviceType, general_copy, fix_recursive_import)
 from flexgen.timer import timers
 from flexgen.utils import (Task, ExecutionEnv, GB, T, ValueHolder,
     array_1d, array_2d, array_3d, str2bool, project_decode_latency,
@@ -28,37 +28,6 @@ from flexgen.utils import (Task, ExecutionEnv, GB, T, ValueHolder,
 fix_recursive_import()
 
 DUMMY_WEIGHT = "_DUMMY_"  # Use dummy weights for benchmark purposes
-
-
-from flexgen.profiler_helper import perf_log
-
-
-import ctypes
-
-_cudart = ctypes.CDLL('libcudart.so')
-
-
-def p_start():
-    ret = _cudart.cudaProfilerStart()
-    if ret != 0:
-        raise Exception("cudaProfilerStart() returned %d" % ret)
-
-
-def p_stop():
-    ret = _cudart.cudaProfilerStop()
-    if ret != 0:
-        raise Exception("cudaProfilerStop() returned %d" % ret)
-
-
-@perf_log(log_path=None)
-def prof_collect(inputs, model, args, cut_gen_len):
-    p_start()
-    print("Cuda Profing ")
-    for i in range(1):
-        output_ids = model.generate(
-            inputs, max_new_tokens=args.gen_len,
-            debug_mode=args.debug_mode, cut_gen_len=cut_gen_len, verbose=args.verbose)
-    p_stop()
 
 
 @dataclasses.dataclass(frozen=True)
@@ -299,8 +268,9 @@ class SelfAttention:
         self.layer_id = layer_id
         self.policy = policy
         self.compute = self.env.gpu
-        self.weight_load_dst = (self.compute.compressed_device if policy.compress_weight
-            else self.compute)
+        #self.weight_load_dst = (self.compute.compressed_device if policy.compress_weight
+        #    else self.compute)
+        self.weight_load_dst = self.env.tp_dev
         self.attention_compute = (self.env.cpu if self.policy.cpu_cache_compute
             else self.env.gpu)
 
@@ -343,10 +313,10 @@ class SelfAttention:
             dst1 = self.weight_load_dst
             dst2 = self.compute
             weight_read_buf.store((
-                w_q.smart_copy(dst1), b_q.smart_copy(dst2),
-                w_k.smart_copy(dst1), b_k.smart_copy(dst2),
-                w_v.smart_copy(dst1), b_v.smart_copy(dst2),
-                w_out.smart_copy(dst1), b_out.smart_copy(dst2),
+                w_q.smart_copy(dst1, dim=0), b_q.smart_copy(dst2),
+                w_k.smart_copy(dst1, dim=0), b_k.smart_copy(dst2),
+                w_v.smart_copy(dst1, dim=0), b_v.smart_copy(dst2),
+                w_out.smart_copy(dst1, dim=1), b_out.smart_copy(dst2),
                 w_ln.smart_copy(dst2), b_ln.smart_copy(dst2)))
 
     def init_cache_one_gpu_batch(self, cache_home):
@@ -497,9 +467,9 @@ class MLP:
         self.layer_id = layer_id
         self.policy = policy
         self.compute = self.env.gpu
-        self.weight_load_dst = (self.compute.compressed_device if policy.compress_weight
-            else self.compute)
-
+        #self.weight_load_dst = (self.compute.compressed_device if policy.compress_weight
+        #    else self.compute)
+        self.weight_load_dst = self.env.tp_dev
         self.task = None
 
     def set_task(self, task):
@@ -531,8 +501,8 @@ class MLP:
             dst1 = self.weight_load_dst
             dst2 = self.compute
             weight_read_buf.store((
-                wi.smart_copy(dst1), bi.smart_copy(dst2),
-                wo.smart_copy(dst1), bo.smart_copy(dst2),
+                wi.smart_copy(dst1, dim=0), bi.smart_copy(dst2),
+                wo.smart_copy(dst1, dim=1), bo.smart_copy(dst2),
                 w_ln.smart_copy(dst2), b_ln.smart_copy(dst2)))
 
     def init_cache_one_gpu_batch(self, cache_home):
@@ -1220,10 +1190,12 @@ def run_flexgen(args):
     warmup_inputs = get_test_inputs(32, num_prompts, tokenizer)
     inputs = get_test_inputs(prompt_len, num_prompts, tokenizer)
 
-    gpu = TorchDevice("cuda:0", args.tp_num)
+    device_list = [TorchDevice(f"cuda:{i}", args.tp_num) for i in range(args.tp_num)]
+    tp_dev = TorchTPDevice(device_list)
+    gpu = device_list[0]#gpu0
     cpu = TorchDevice("cpu")
     disk = TorchDisk(args.offload_dir)
-    env = ExecutionEnv(gpu=gpu, cpu=cpu, disk=disk, mixed=TorchMixedDevice([gpu, cpu, disk]))
+    env = ExecutionEnv(gpu=gpu, cpu=cpu, disk=disk, mixed=TorchMixedDevice([gpu, cpu, disk]), tp_dev=tp_dev)
 
     policy = Policy(args.gpu_batch_size, args.num_gpu_batches,
                     args.percent[0], args.percent[1],
@@ -1260,8 +1232,6 @@ def run_flexgen(args):
             inputs, max_new_tokens=args.gen_len,
             debug_mode=args.debug_mode, cut_gen_len=cut_gen_len, verbose=args.verbose)
         costs = timers("generate").costs
-
-        #prof_collect(inputs, model, args, cut_gen_len)
     finally:
         env.close_copy_threads()
 

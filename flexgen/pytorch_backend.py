@@ -73,6 +73,7 @@ class DeviceType(Enum):
     DISK = auto()
     MIXED = auto()
     COMPRESSED = auto()
+    TP = auto()
 
     @staticmethod
     def convert(name):
@@ -86,9 +87,37 @@ class DeviceType(Enum):
             return DeviceType.MIXED
         elif name == "compressed":
             return DeviceType.COMPRESSED
+        elif name == "tp":
+            return DeviceType.TP
         else:
             raise ValueError(f"Invalid name: {name}")
 
+class TorchTPDevice:
+
+    def __init__(self, base_devices):
+        self.name = "tp"
+        self.device_type = DeviceType.TP
+        self.base_devices = base_devices
+
+    def allocate(self, shape, dtype, dim=0, name=None):
+        devices = self.base_devices
+
+        if dim == 0:
+            first_element = shape[0]
+            split_element = int(first_element / len(devices))
+            new_tuple = (split_element,) + shape[1:]
+        elif dim == 1:
+            first_element = shape[0]
+            second_element = shape[1]
+            split_element = int(second_element / len(devices))
+            new_tuple = (first_element, split_element)
+
+        tensors = []
+        for i in range(len(devices)):
+            tensors.append(devices[i].allocate(new_tuple, dtype))
+
+        return TorchTensor(shape, np_dtype_to_torch_dtype[dtype],
+                           tensors, self, name=name)
 
 class TorchTensor:
     """
@@ -162,7 +191,7 @@ class TorchTensor:
         else:
             self.load_from_np(np.load(filename))
 
-    def copy(self, dst, src_indices=None):
+    def copy(self, dst, src_indices=None, dim=0):
         if src_indices:
             assert all(x.step is None for x in src_indices)
             shape = tuple(x.stop - x.start for x in src_indices
@@ -172,15 +201,17 @@ class TorchTensor:
 
         if dst.device_type == DeviceType.COMPRESSED:
             ret = dst.allocate(shape, torch_dtype_to_np_dtype[self.dtype], self.data[2])
+        elif dst.device_type == DeviceType.TP:
+            ret = dst.allocate(shape, torch_dtype_to_np_dtype[self.dtype], dim = dim)
         else:
             ret = dst.allocate(shape, torch_dtype_to_np_dtype[self.dtype])
         general_copy(ret, None, self, src_indices)
         return ret
 
-    def smart_copy(self, dst, src_indices=None):
+    def smart_copy(self, dst, src_indices=None, dim=0):
         if self.device == dst:
             return self, False
-        return self.copy(dst, src_indices=src_indices), True
+        return self.copy(dst, src_indices=src_indices, dim=dim), True
 
     def move(self, dst):
         if self.device == dst:
@@ -356,9 +387,6 @@ class TorchDevice:
         hidden = F.layer_norm(inputs.data, (h,), weight=w_ln.data, bias=b_ln.data)
 
         #attention的qkv, 列切
-        w_q_data_chunks = nn.parallel.scatter(w_q.data, self.gpu_devices, dim=0)
-        w_k_data_chunks = nn.parallel.scatter(w_k.data, self.gpu_devices, dim=0)
-        w_v_data_chunks = nn.parallel.scatter(w_v.data, self.gpu_devices, dim=0)
         b_q_data_chunks = nn.parallel.scatter(b_q.data, self.gpu_devices, dim=0)
         b_k_data_chunks = nn.parallel.scatter(b_k.data, self.gpu_devices, dim=0)
         b_v_data_chunks = nn.parallel.scatter(b_v.data, self.gpu_devices, dim=0)
@@ -369,13 +397,12 @@ class TorchDevice:
         replicas = nn.parallel.replicate(self.mha_qkv_tp_mod, self.gpu_devices)
         for i in self.gpu_devices:#权重切片到各自模型中
             replicas[i].scaling   = scaling
-            replicas[i].q_weight  = w_q_data_chunks[i]
+            replicas[i].q_weight  = w_q.data[i].data
             replicas[i].q_bias    = b_q_data_chunks[i]
-            replicas[i].k_weight  = w_k_data_chunks[i]
+            replicas[i].k_weight  = w_k.data[i].data
             replicas[i].k_bias    = b_k_data_chunks[i]
-            replicas[i].v_weight  = w_v_data_chunks[i]
+            replicas[i].v_weight  = w_v.data[i].data
             replicas[i].v_bias    = b_v_data_chunks[i]
-
         outputs = nn.parallel.parallel_apply(replicas, hidden_datas)
 
         q_results = [o[0] for o in outputs]
@@ -418,12 +445,10 @@ class TorchDevice:
 
 
         value_chunks = nn.parallel.scatter(value, self.gpu_devices, dim=2)
-        #attention的qkv, 列切
-        w_out_data_chunks = nn.parallel.scatter(w_out.data, self.gpu_devices, dim=1)
 
         replicas = nn.parallel.replicate(self.mha_fc_tp_mod, self.gpu_devices)
         for i in self.gpu_devices:
-            replicas[i].fc_weight = w_out_data_chunks[i]
+            replicas[i].fc_weight = w_out.data[i].data
 
         outputs = nn.parallel.parallel_apply(replicas, value_chunks)
         value = nn.parallel.comm.reduce_add(outputs, 0) + b_out.data
@@ -470,9 +495,6 @@ class TorchDevice:
         #v = F.linear(hidden, w_v.data, bias=b_v.data)
 
         #attention的qkv, 列切
-        w_q_data_chunks = nn.parallel.scatter(w_q.data, self.gpu_devices, dim=0)
-        w_k_data_chunks = nn.parallel.scatter(w_k.data, self.gpu_devices, dim=0)
-        w_v_data_chunks = nn.parallel.scatter(w_v.data, self.gpu_devices, dim=0)
         b_q_data_chunks = nn.parallel.scatter(b_q.data, self.gpu_devices, dim=0)
         b_k_data_chunks = nn.parallel.scatter(b_k.data, self.gpu_devices, dim=0)
         b_v_data_chunks = nn.parallel.scatter(b_v.data, self.gpu_devices, dim=0)
@@ -483,11 +505,11 @@ class TorchDevice:
         replicas = nn.parallel.replicate(self.mha_qkv_tp_mod, self.gpu_devices)
         for i in self.gpu_devices:#权重切片到各自模型中
             replicas[i].scaling   = scaling
-            replicas[i].q_weight  = w_q_data_chunks[i]
+            replicas[i].q_weight  = w_q.data[i].data
             replicas[i].q_bias    = b_q_data_chunks[i]
-            replicas[i].k_weight  = w_k_data_chunks[i]
+            replicas[i].k_weight  = w_k.data[i].data
             replicas[i].k_bias    = b_k_data_chunks[i]
-            replicas[i].v_weight  = w_v_data_chunks[i]
+            replicas[i].v_weight  = w_v.data[i].data
             replicas[i].v_bias    = b_v_data_chunks[i]
 
         outputs = nn.parallel.parallel_apply(replicas, hidden_datas)
@@ -564,12 +586,10 @@ class TorchDevice:
         value = value.transpose(1, 2).view(b, tgt_s, h)
 
         value_chunks = nn.parallel.scatter(value, self.gpu_devices, dim=2)
-        #attention的qkv, 列切
-        w_out_data_chunks = nn.parallel.scatter(w_out.data, self.gpu_devices, dim=1)
 
         replicas = nn.parallel.replicate(self.mha_fc_tp_mod, self.gpu_devices)
         for i in self.gpu_devices:
-            replicas[i].fc_weight = w_out_data_chunks[i]
+            replicas[i].fc_weight = w_out.data[i].data
 
         outputs = nn.parallel.parallel_apply(replicas, value_chunks)
         value = nn.parallel.comm.reduce_add(outputs, 0) + b_out.data
@@ -700,16 +720,14 @@ class TorchDevice:
         out = F.layer_norm(inputs.data, (h,), weight=w_ln.data, bias=b_ln.data)
 
         out_datas = nn.parallel.comm.broadcast(out, self.gpu_devices)
-        wi_data_chunks = nn.parallel.scatter(wi.data, self.gpu_devices, dim=0)#列切
         bi_data_chunks = nn.parallel.scatter(bi.data, self.gpu_devices, dim=0)
-        wo_data_chunks = nn.parallel.scatter(wo.data, self.gpu_devices, dim=1)#行切
 
         # 复制模型副本到多个设备
         replicas = nn.parallel.replicate(self.mlp_tp_mod, self.gpu_devices)
         for i in self.gpu_devices:#权重切片到各自模型中
-            replicas[i].fc1_weight = wi_data_chunks[i]
+            replicas[i].fc1_weight = wi.data[i].data
             replicas[i].fc1_bias   = bi_data_chunks[i]
-            replicas[i].fc2_weight = wo_data_chunks[i]
+            replicas[i].fc2_weight = wo.data[i].data
 
         # 在每个设备上执行线性变换并汇总输出
         outputs = nn.parallel.parallel_apply(replicas, out_datas)
@@ -989,7 +1007,16 @@ def general_copy(dst: TorchTensor, dst_indices: Tuple[slice],
         # The normal path
         src = src.data[src_indices] if src_indices else src.data
         dst = dst.data[dst_indices] if dst_indices else dst.data
-        dst.copy_(src, non_blocking=True)
+        if type(dst) == list:
+            if src.size()[0] // len(dst) == dst[0].data.size()[0]:#行切/列切两种情况
+                dim = 0
+            else:
+                dim = 1
+            src = torch.chunk(src, len(dst), dim=dim)
+            for d, s in zip(dst, src):
+                d.data.copy_(s, non_blocking=True)
+        else:
+            dst.copy_(src, non_blocking=True)
 
 
 def cut_indices(indices, start, stop, base=0):
