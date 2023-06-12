@@ -1005,14 +1005,27 @@ def general_copy(dst: TorchTensor, dst_indices: Tuple[slice],
         dst.copy_(src, non_blocking=True)
     else:
         # The normal path
+        src_is_cpu = None
+        if src.device.device_type == DeviceType.CPU:
+           src_is_cpu = True 
+
         src = src.data[src_indices] if src_indices else src.data
         dst = dst.data[dst_indices] if dst_indices else dst.data
+
+        if src_is_cpu:
+            src = src.pin_memory()
+
         if type(dst) == list:
             if src.size()[0] // len(dst) == dst[0].data.size()[0]:#行切/列切两种情况
                 dim = 0
             else:
                 dim = 1
+
             src = torch.chunk(src, len(dst), dim=dim)
+
+            if src_is_cpu:    
+                src = [s.pin_memory() for s in src]
+
             for d, s in zip(dst, src):
                 d.data.copy_(s, non_blocking=True)
         else:
