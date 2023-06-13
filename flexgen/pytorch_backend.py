@@ -98,6 +98,16 @@ class TorchTPDevice:
         self.name = "tp"
         self.device_type = DeviceType.TP
         self.base_devices = base_devices
+        self.tp_num = len(base_devices)
+        # Copy threads
+        self.copy_queues = [queue.Queue() for _ in range(self.tp_num)]
+        self.copy_threads = [
+            threading.Thread(
+                target=copy_worker_func_tp, args=(self.copy_queues[cuda_id], cuda_id)
+            ) for cuda_id in range(self.tp_num)
+        ]
+        for t in self.copy_threads:
+            t.start()
 
     def allocate(self, shape, dtype, dim=0, name=None):
         devices = self.base_devices
@@ -118,6 +128,70 @@ class TorchTPDevice:
 
         return TorchTensor(shape, np_dtype_to_torch_dtype[dtype],
                            tensors, self, name=name)
+
+    def submit_copy(self, *args):
+        dst, dst_indices, src, src_indices = args
+        src = src.data[src_indices] if src_indices else src.data
+        dst = dst.data[dst_indices] if dst_indices else dst.data
+        src = src.pin_memory()
+        if type(dst) == list:
+            if src.size()[0] // len(dst) == dst[0].data.size()[0]:#行切/列切两种情况
+                dim = 0
+            else:
+                dim = 1
+            src = torch.chunk(src, len(dst), dim=dim)
+            src = [s.pin_memory() for s in src]
+            for id in range(self.tp_num):
+                self.copy_queues[id].put_nowait((dst[id].data, src[id]))
+        self.synchronize()
+
+    def synchronize(self):
+        for id in range(self.tp_num):
+            self.copy_queues[id].join()
+
+    def close_copy_threads(self):
+        for id in range(self.tp_num):
+            self.copy_queues[id].put_nowait(None)
+        for t in self.copy_threads:
+            t.join()
+        for id in range(self.tp_num):
+            self.copy_queues[id].join()
+            self.copy_queues[id] = None
+
+    def mem_stats(self):
+        raise NotImplementedError()
+
+    def print_stats(self):
+        raise NotImplementedError()
+
+    def __del__(self):
+        if self.copy_queues[0]:
+            self.close_copy_threads()
+
+def copy_worker_func_tp(queue, cuda_id):
+    """The copy worker thread."""
+    torch.cuda.set_device(cuda_id)
+
+    #cpu_buf = torch.empty((1 * GB,), dtype=torch.float16, pin_memory=True)
+    copy_stream = torch.cuda.Stream()
+
+    with torch.cuda.stream(copy_stream):
+        while True:
+            item = queue.get()
+            if item is None:
+                queue.task_done()
+                return
+
+            dst, src    = item
+            # Use a pinned cpu buffer as a relay
+            #size = np.prod(src.shape)
+            #tmp_cpu_buf = cpu_buf[:size].view(src.shape)
+            #tmp_cpu_buf.copy_(src)
+            #dst.copy_(tmp_cpu_buf, non_blocking=True)
+            #dst.copy_(src, non_blocking=False)
+            dst.copy_(src, non_blocking=True)
+
+            queue.task_done()
 
 class TorchTensor:
     """
@@ -1003,33 +1077,14 @@ def general_copy(dst: TorchTensor, dst_indices: Tuple[slice],
         dst = dst.data[dst_indices] if dst_indices else dst.data
         src = src.pin_memory()
         dst.copy_(src, non_blocking=True)
+    elif  (src.device.device_type == DeviceType.CPU and
+            dst.device.device_type == DeviceType.TP):
+        dst.device.submit_copy(dst, dst_indices, src, src_indices)
     else:
         # The normal path
-        src_is_cpu = None
-        if src.device.device_type == DeviceType.CPU:
-           src_is_cpu = True 
-
         src = src.data[src_indices] if src_indices else src.data
         dst = dst.data[dst_indices] if dst_indices else dst.data
-
-        if src_is_cpu:
-            src = src.pin_memory()
-
-        if type(dst) == list:
-            if src.size()[0] // len(dst) == dst[0].data.size()[0]:#行切/列切两种情况
-                dim = 0
-            else:
-                dim = 1
-
-            src = torch.chunk(src, len(dst), dim=dim)
-
-            if src_is_cpu:    
-                src = [s.pin_memory() for s in src]
-
-            for d, s in zip(dst, src):
-                d.data.copy_(s, non_blocking=True)
-        else:
-            dst.copy_(src, non_blocking=True)
+        dst.copy_(src, non_blocking=True)
 
 
 def cut_indices(indices, start, stop, base=0):
