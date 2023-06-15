@@ -30,6 +30,34 @@ fix_recursive_import()
 DUMMY_WEIGHT = "_DUMMY_"  # Use dummy weights for benchmark purposes
 
 
+import ctypes
+
+_cudart = ctypes.CDLL('libcudart.so')
+
+
+def p_start():
+    ret = _cudart.cudaProfilerStart()
+    if ret != 0:
+        raise Exception("cudaProfilerStart() returned %d" % ret)
+
+
+def p_stop():
+    ret = _cudart.cudaProfilerStop()
+    if ret != 0:
+        raise Exception("cudaProfilerStop() returned %d" % ret)
+
+
+def prof_collect(inputs, model, args, cut_gen_len):
+    p_start()
+    print("Cuda Profing ")
+    for i in range(1):
+        output_ids = model.generate(
+            inputs, max_new_tokens=args.gen_len,
+            debug_mode=args.debug_mode, cut_gen_len=cut_gen_len, verbose=args.verbose)
+    p_stop()
+
+
+
 @dataclasses.dataclass(frozen=True)
 class Policy:
     gpu_batch_size: int
@@ -1252,6 +1280,7 @@ def run_flexgen(args):
             inputs, max_new_tokens=args.gen_len,
             debug_mode=args.debug_mode, cut_gen_len=cut_gen_len, verbose=args.verbose)
         costs = timers("generate").costs
+        prof_collect(inputs, model, args, cut_gen_len)
     finally:
         env.close_copy_threads()
 

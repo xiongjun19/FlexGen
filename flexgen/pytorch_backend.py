@@ -99,15 +99,6 @@ class TorchTPDevice:
         self.device_type = DeviceType.TP
         self.base_devices = base_devices
         self.tp_num = len(base_devices)
-        # Copy threads
-        self.copy_queues = [queue.Queue() for _ in range(self.tp_num)]
-        self.copy_threads = [
-            threading.Thread(
-                target=copy_worker_func_tp, args=(self.copy_queues[cuda_id], cuda_id)
-            ) for cuda_id in range(self.tp_num)
-        ]
-        for t in self.copy_threads:
-            t.start()
 
     def allocate(self, shape, dtype, dim=0, name=None):
         devices = self.base_devices
@@ -128,70 +119,6 @@ class TorchTPDevice:
 
         return TorchTensor(shape, np_dtype_to_torch_dtype[dtype],
                            tensors, self, name=name)
-
-    def submit_copy(self, *args):
-        dst, dst_indices, src, src_indices = args
-        src = src.data[src_indices] if src_indices else src.data
-        dst = dst.data[dst_indices] if dst_indices else dst.data
-        src = src.pin_memory()
-        if type(dst) == list:
-            if src.size()[0] // len(dst) == dst[0].data.size()[0]:#行切/列切两种情况
-                dim = 0
-            else:
-                dim = 1
-            src = torch.chunk(src, len(dst), dim=dim)
-            src = [s.pin_memory() for s in src]
-            for id in range(self.tp_num):
-                self.copy_queues[id].put_nowait((dst[id].data, src[id]))
-        self.synchronize()
-
-    def synchronize(self):
-        for id in range(self.tp_num):
-            self.copy_queues[id].join()
-
-    def close_copy_threads(self):
-        for id in range(self.tp_num):
-            self.copy_queues[id].put_nowait(None)
-        for t in self.copy_threads:
-            t.join()
-        for id in range(self.tp_num):
-            self.copy_queues[id].join()
-            self.copy_queues[id] = None
-
-    def mem_stats(self):
-        raise NotImplementedError()
-
-    def print_stats(self):
-        raise NotImplementedError()
-
-    def __del__(self):
-        if self.copy_queues[0]:
-            self.close_copy_threads()
-
-def copy_worker_func_tp(queue, cuda_id):
-    """The copy worker thread."""
-    torch.cuda.set_device(cuda_id)
-
-    #cpu_buf = torch.empty((1 * GB,), dtype=torch.float16, pin_memory=True)
-    copy_stream = torch.cuda.Stream()
-
-    with torch.cuda.stream(copy_stream):
-        while True:
-            item = queue.get()
-            if item is None:
-                queue.task_done()
-                return
-
-            dst, src    = item
-            # Use a pinned cpu buffer as a relay
-            #size = np.prod(src.shape)
-            #tmp_cpu_buf = cpu_buf[:size].view(src.shape)
-            #tmp_cpu_buf.copy_(src)
-            #dst.copy_(tmp_cpu_buf, non_blocking=True)
-            #dst.copy_(src, non_blocking=False)
-            dst.copy_(src, non_blocking=True)
-
-            queue.task_done()
 
 class TorchTensor:
     """
@@ -460,11 +387,6 @@ class TorchDevice:
 
         hidden = F.layer_norm(inputs.data, (h,), weight=w_ln.data, bias=b_ln.data)
 
-        #attention的qkv, 列切
-        b_q_data_chunks = nn.parallel.scatter(b_q.data, self.gpu_devices, dim=0)
-        b_k_data_chunks = nn.parallel.scatter(b_k.data, self.gpu_devices, dim=0)
-        b_v_data_chunks = nn.parallel.scatter(b_v.data, self.gpu_devices, dim=0)
-        #hidden_data 不切割, 广播
         hidden_datas = nn.parallel.comm.broadcast(hidden, self.gpu_devices)
 
         # 复制模型副本到多个设备
@@ -472,11 +394,11 @@ class TorchDevice:
         for i in self.gpu_devices:#权重切片到各自模型中
             replicas[i].scaling   = scaling
             replicas[i].q_weight  = w_q.data[i].data
-            replicas[i].q_bias    = b_q_data_chunks[i]
+            replicas[i].q_bias    = b_q.data[i].data
             replicas[i].k_weight  = w_k.data[i].data
-            replicas[i].k_bias    = b_k_data_chunks[i]
+            replicas[i].k_bias    = b_k.data[i].data
             replicas[i].v_weight  = w_v.data[i].data
-            replicas[i].v_bias    = b_v_data_chunks[i]
+            replicas[i].v_bias    = b_v.data[i].data
         outputs = nn.parallel.parallel_apply(replicas, hidden_datas)
 
         q_results = [o[0] for o in outputs]
@@ -563,16 +485,6 @@ class TorchDevice:
 
         hidden = F.layer_norm(inputs.data, (h,), weight=w_ln.data, bias=b_ln.data)
 
-        # shape: (b, 1, h)
-        #q = F.linear(hidden, w_q.data, bias=b_q.data) * scaling
-        #k = F.linear(hidden, w_k.data, bias=b_k.data)
-        #v = F.linear(hidden, w_v.data, bias=b_v.data)
-
-        #attention的qkv, 列切
-        b_q_data_chunks = nn.parallel.scatter(b_q.data, self.gpu_devices, dim=0)
-        b_k_data_chunks = nn.parallel.scatter(b_k.data, self.gpu_devices, dim=0)
-        b_v_data_chunks = nn.parallel.scatter(b_v.data, self.gpu_devices, dim=0)
-        #hidden_data 不切割, 广播
         hidden_datas = nn.parallel.comm.broadcast(hidden, self.gpu_devices)
 
         # 复制模型副本到多个设备
@@ -580,11 +492,11 @@ class TorchDevice:
         for i in self.gpu_devices:#权重切片到各自模型中
             replicas[i].scaling   = scaling
             replicas[i].q_weight  = w_q.data[i].data
-            replicas[i].q_bias    = b_q_data_chunks[i]
+            replicas[i].q_bias    = b_q.data[i].data
             replicas[i].k_weight  = w_k.data[i].data
-            replicas[i].k_bias    = b_k_data_chunks[i]
+            replicas[i].k_bias    = b_k.data[i].data
             replicas[i].v_weight  = w_v.data[i].data
-            replicas[i].v_bias    = b_v_data_chunks[i]
+            replicas[i].v_bias    = b_v.data[i].data
 
         outputs = nn.parallel.parallel_apply(replicas, hidden_datas)
 
@@ -794,13 +706,12 @@ class TorchDevice:
         out = F.layer_norm(inputs.data, (h,), weight=w_ln.data, bias=b_ln.data)
 
         out_datas = nn.parallel.comm.broadcast(out, self.gpu_devices)
-        bi_data_chunks = nn.parallel.scatter(bi.data, self.gpu_devices, dim=0)
 
         # 复制模型副本到多个设备
         replicas = nn.parallel.replicate(self.mlp_tp_mod, self.gpu_devices)
         for i in self.gpu_devices:#权重切片到各自模型中
             replicas[i].fc1_weight = wi.data[i].data
-            replicas[i].fc1_bias   = bi_data_chunks[i]
+            replicas[i].fc1_bias   = bi.data[i].data
             replicas[i].fc2_weight = wo.data[i].data
 
         # 在每个设备上执行线性变换并汇总输出
@@ -1077,9 +988,13 @@ def general_copy(dst: TorchTensor, dst_indices: Tuple[slice],
         dst = dst.data[dst_indices] if dst_indices else dst.data
         src = src.pin_memory()
         dst.copy_(src, non_blocking=True)
-    elif  (src.device.device_type == DeviceType.CPU and
+    elif  (src.device.device_type == DeviceType.TP and
             dst.device.device_type == DeviceType.TP):
-        dst.device.submit_copy(dst, dst_indices, src, src_indices)
+        src = src.data[src_indices] if src_indices else src.data
+        dst = dst.data[dst_indices] if dst_indices else dst.data
+        for d, s in zip(dst, src):
+            d.data.copy_(s.data, non_blocking=True)
+
     else:
         # The normal path
         src = src.data[src_indices] if src_indices else src.data
