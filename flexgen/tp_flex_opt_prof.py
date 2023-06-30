@@ -18,11 +18,11 @@ from transformers import AutoTokenizer
 from flexgen.compression import CompressionConfig
 from flexgen.opt_config import OptConfig, get_opt_config, download_opt_weights
 from flexgen.pytorch_backend import (TorchDevice, TorchDisk, TorchLink,
-    TorchMixedDevice, TorchTPDevice, DeviceType, general_copy, fix_recursive_import)
+    TorchMixedDevice, TorchTPDevice, TorchTensor, DeviceType, general_copy, fix_recursive_import)
 from flexgen.timer import timers
 from flexgen.utils import (Task, ExecutionEnv, GB, T, ValueHolder,
     array_1d, array_2d, array_3d, str2bool, project_decode_latency,
-    torch_mem_stats, torch_dtype_to_np_dtype, write_benchmark_log,
+    torch_mem_stats, torch_dtype_to_np_dtype, np_dtype_to_torch_dtype, write_benchmark_log,
     read_benchmark_log)
 
 fix_recursive_import()
@@ -55,6 +55,7 @@ def prof_collect(inputs, model, args, cut_gen_len):
             inputs, max_new_tokens=args.gen_len,
             debug_mode=args.debug_mode, cut_gen_len=cut_gen_len, verbose=args.verbose)
     p_stop()
+
 
 
 @dataclasses.dataclass(frozen=True)
@@ -126,7 +127,12 @@ def init_weight_list(weight_specs, policy, env):
     for i in range(len(weight_specs)):
         mid_percent = (sizes_cumsum[i] - sizes[i] / 2) / sizes_cumsum[-1]
         home = get_choice(mid_percent * 100, dev_percents, dev_choices)
-        shape, dtype, filename = weight_specs[i]
+        if len(weight_specs[i]) == 3:
+            shape, dtype, filename = weight_specs[i]
+            tp_num = None
+            dim    = None
+        else:
+            shape, dtype, filename, tp_num, dim = weight_specs[i]
 
         if len(shape) < 2:
             pin_memory = True
@@ -136,13 +142,29 @@ def init_weight_list(weight_specs, policy, env):
             compress = policy.compress_weight
 
         if not compress:
-            weight = home.allocate(shape, dtype, pin_memory=pin_memory)
+            if tp_num == None:
+                weight = home.allocate(shape, dtype, pin_memory=pin_memory)
 
-            if DUMMY_WEIGHT not in filename:
-                weight.load_from_np_file(weight_specs[i][2])
+                if DUMMY_WEIGHT not in filename:
+                    weight.load_from_np_file(filename)
+                else:
+                    weight.load_from_np(np.ones(shape, dtype))
             else:
-                weight.load_from_np(np.ones(shape, dtype))
-                #weight.load_from_np(np.random.rand(*shape).astype(dtype))
+                weight = home.allocate(shape, dtype, pin_memory=pin_memory)
+                if DUMMY_WEIGHT not in filename:
+                    weight.load_from_np_file(filename)
+                else:
+                    weight.load_from_np(np.ones(shape, dtype))
+                # weight.load_from_np_file(filename)
+                weights = torch.chunk(weight.data, tp_num, dim=dim)
+                new_weights=[]
+                for w in weights:
+                    new_w = home.allocate(w.shape, dtype, pin_memory=True)
+                    new_w.data.copy_(w)
+                    new_weights.append(new_w)
+                device_list = [TorchDevice(f"cpu", tp_num) for i in range(tp_num)]
+                weight = TorchTensor(shape, np_dtype_to_torch_dtype[dtype], new_weights, TorchTPDevice(device_list))
+
         else:
             weight = home.compressed_device.allocate(
                 shape, dtype, policy.comp_weight_config, pin_memory=pin_memory)
@@ -289,7 +311,7 @@ class OutputEmbed:
 
 
 class SelfAttention:
-    def __init__(self, config, env, policy, layer_id):
+    def __init__(self, config, env, policy, layer_id, tp_num):
         self.config = config
         self.env = env
         self.layer_id = layer_id
@@ -302,6 +324,7 @@ class SelfAttention:
             else self.env.gpu)
 
         self.task = None
+        self.tp_num = tp_num
 
     def set_task(self, task):
         self.task = task
@@ -311,19 +334,19 @@ class SelfAttention:
         path = os.path.join(os.path.join(path, f"decoder.layers.{self.layer_id}.self_attn"))
         weight_specs = [
             # w_q
-            ((h, h), dtype, path + ".q_proj.weight"),
+            ((h, h), dtype, path + ".q_proj.weight", self.tp_num, 0),
             # b_q
-            ((h,), dtype, path + ".q_proj.bias"),
+            ((h,), dtype, path + ".q_proj.bias", self.tp_num, 0),
             # w_k
-            ((h, h), dtype, path + ".k_proj.weight"),
+            ((h, h), dtype, path + ".k_proj.weight", self.tp_num, 0),
             # b_k
-            ((h,), dtype, path + ".k_proj.bias"),
+            ((h,), dtype, path + ".k_proj.bias", self.tp_num, 0),
             # w_v
-            ((h, h), dtype, path + ".v_proj.weight"),
+            ((h, h), dtype, path + ".v_proj.weight", self.tp_num, 0),
             # b_v
-            ((h,), dtype, path + ".v_proj.bias"),
+            ((h,), dtype, path + ".v_proj.bias", self.tp_num, 0),
             # w_out
-            ((h, h), dtype, path + ".out_proj.weight"),
+            ((h, h), dtype, path + ".out_proj.weight", self.tp_num, 1),
             # b_out
             ((h,), dtype, path + ".out_proj.bias"),
             # w_ln
@@ -340,9 +363,9 @@ class SelfAttention:
             dst1 = self.weight_load_dst
             dst2 = self.compute
             weight_read_buf.store((
-                w_q.smart_copy(dst1, dim=0), b_q.smart_copy(dst2),
-                w_k.smart_copy(dst1, dim=0), b_k.smart_copy(dst2),
-                w_v.smart_copy(dst1, dim=0), b_v.smart_copy(dst2),
+                w_q.smart_copy(dst1, dim=0), b_q.smart_copy(dst1, dim=0),
+                w_k.smart_copy(dst1, dim=0), b_k.smart_copy(dst1, dim=0),
+                w_v.smart_copy(dst1, dim=0), b_v.smart_copy(dst1, dim=0),
                 w_out.smart_copy(dst1, dim=1), b_out.smart_copy(dst2),
                 w_ln.smart_copy(dst2), b_ln.smart_copy(dst2)))
 
@@ -488,7 +511,7 @@ class SelfAttention:
 
 
 class MLP:
-    def __init__(self, config, env, policy, layer_id):
+    def __init__(self, config, env, policy, layer_id, tp_num):
         self.config = config
         self.env = env
         self.layer_id = layer_id
@@ -498,6 +521,7 @@ class MLP:
         #    else self.compute)
         self.weight_load_dst = self.env.tp_dev
         self.task = None
+        self.tp_num = tp_num
 
     def set_task(self, task):
         self.task = task
@@ -507,11 +531,11 @@ class MLP:
         path = os.path.join(os.path.join(path, f"decoder.layers.{self.layer_id}."))
         weight_specs = [
             # wi
-            ((4 * h, h), dtype, path + "fc1.weight"),
+            ((4 * h, h), dtype, path + "fc1.weight", self.tp_num, 0),
             # bi
-            ((4 * h,), dtype, path + "fc1.bias"),
+            ((4 * h,), dtype, path + "fc1.bias", self.tp_num, 0),
             # wo
-            ((h, 4 * h), dtype, path + "fc2.weight"),
+            ((h, 4 * h), dtype, path + "fc2.weight", self.tp_num, 1),
             # bo
             ((h,), dtype, path + "fc2.bias"),
             # w_ln
@@ -528,7 +552,7 @@ class MLP:
             dst1 = self.weight_load_dst
             dst2 = self.compute
             weight_read_buf.store((
-                wi.smart_copy(dst1, dim=0), bi.smart_copy(dst2),
+                wi.smart_copy(dst1, dim=0), bi.smart_copy(dst1, dim=0),
                 wo.smart_copy(dst1, dim=1), bo.smart_copy(dst2),
                 w_ln.smart_copy(dst2), b_ln.smart_copy(dst2)))
 
@@ -562,9 +586,9 @@ class MLP:
 
 
 class TransformerLayer:
-    def __init__(self, config, env, policy, i):
-        self.attention = SelfAttention(config, env, policy, i)
-        self.mlp = MLP(config, env, policy, i)
+    def __init__(self, config, env, policy, i, tp_num):
+        self.attention = SelfAttention(config, env, policy, i, tp_num)
+        self.mlp = MLP(config, env, policy, i, tp_num)
         self.policy = policy
         self.compute = self.attention.compute
 
@@ -612,7 +636,8 @@ class OptLM:
                  config: Union[str, OptConfig],
                  env: ExecutionEnv,
                  path: str,
-                 policy: Policy):
+                 policy: Policy,
+                 tp_num: int):
         if isinstance(config, str):
             config = get_opt_config(config)
         self.config = config
@@ -625,10 +650,10 @@ class OptLM:
         layers.append(InputEmbed(self.config, self.env, self.policy))
         for i in range(self.config.num_hidden_layers):
             if policy.sep_layer:
-                layers.append(SelfAttention(self.config, self.env, self.policy, i))
-                layers.append(MLP(self.config, self.env, self.policy, i))
+                layers.append(SelfAttention(self.config, self.env, self.policy, i, tp_num))
+                layers.append(MLP(self.config, self.env, self.policy, i, tp_num))
             else:
-                layers.append(TransformerLayer(self.config, self.env, self.policy, i))
+                layers.append(TransformerLayer(self.config, self.env, self.policy, i, tp_num))
         layers.append(OutputEmbed(self.config, self.env, self.policy))
         self.layers = layers
         self.num_layers = len(layers)
@@ -1246,7 +1271,7 @@ def run_flexgen(args):
           f"hidden size (prefill): {hidden_size/GB:.3f} GB")
 
     print("init weight...")
-    model = OptLM(opt_config, env, args.path, policy)
+    model = OptLM(opt_config, env, args.path, policy, args.tp_num)
 
     try:
         print("warmup - generate")

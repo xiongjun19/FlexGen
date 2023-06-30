@@ -123,7 +123,11 @@ def init_weight_list(weight_specs, policy, env):
                     weight.load_from_np(np.ones(shape, dtype))
             else:
                 weight = home.allocate(shape, dtype, pin_memory=pin_memory)
-                weight.load_from_np_file(filename)
+                if DUMMY_WEIGHT not in filename:
+                    weight.load_from_np_file(filename)
+                else:
+                    weight.load_from_np(np.ones(shape, dtype))
+                # weight.load_from_np_file(filename)
                 weights = torch.chunk(weight.data, tp_num, dim=dim)
                 new_weights=[]
                 for w in weights:
