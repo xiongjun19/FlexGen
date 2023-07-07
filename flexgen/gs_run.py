@@ -91,6 +91,7 @@ def main():
         if os.path.exists(f_path):
             print(f"the file exits: {f_path}")
             continue
+        print(f"starting collect file: {f_path}")
         policy = policy.replace(":", " ")
 
         cmd_args = f"{exec_f} --model facebook/{model_name} {off_args} " \
