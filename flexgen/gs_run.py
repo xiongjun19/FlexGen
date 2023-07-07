@@ -37,7 +37,7 @@ def iter_recursive(arr_list):
 
 
 def get_para_arrs():
-    bs_arr = [1, 4, 16, 32, 64, 128]
+    bs_arr = [1, 64, 4, 16, 32, 128]
     num_bs_arr = [1, 2, 4, 16]
     weight_arr = ["0:100", "10:90", "20:80", "30:70"]
     cache_arr = ["100:0", "80:20", "60:40", "40:60", "20:80", "0:100"]
@@ -64,7 +64,7 @@ def main():
     off_args = "--offload-dir /workspace/data/flex_offload_dir"
     args = get_args()
     card_num = 1
-    exec_f = 'tp_flex_opt.py'
+    exec_f = 'flex_opt.py'
     pipe_mode = False
     tp_mode = False
     if args.para == 'pp' or args.para == 'pipe':
@@ -88,22 +88,27 @@ def main():
         f_path = _get_log_path(model_name, pipe_mode, tp_mode, context_len,
                                output_len, act_bs, num_bs, policy, comp, card_num)
         f_path = os.path.join(args.out, f_path)
+        if os.path.exists(f_path):
+            print(f"the file exits: {f_path}")
+            continue
+        print(f"starting collect file: {f_path}")
         policy = policy.replace(":", " ")
 
         cmd_args = f"{exec_f} --model facebook/{model_name} {off_args} " \
                 f"--path _DUMMY_ --percent {policy} --gpu-batch-size {bs} " \
                 f"--num-gpu-batches {num_bs}  --prompt-len {context_len} --gen-len {output_len} " \
                 f"--log-file {f_path}"
-        if not pipe_mode:
+        if not pipe_mode and tp_mode:
             cmd = f"python {cmd_args} --tp {card_num} "
-        else:
+        elif pipe_mode:
             cmd = f" mpirun --allow-run-as-root --map-by ppr:{card_num}:node:pe=12 "\
                   f" --oversubscribe --bind-to core -x OMP_NUM_THREADS=12 " \
                   f"python {cmd_args} --use-mpi  --comm-device cpu  "
+        else:
+            cmd = f"python {cmd_args} "
         if comp == 1:
             cmd = cmd + " " + "--compress-weight --compress-cache"
         exe_cmd_sync(cmd)
-
 
 
 def _get_log_path(model_name, pipe_mode, tp_mode,
