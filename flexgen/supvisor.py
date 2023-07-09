@@ -39,8 +39,7 @@ def get_lines(in_file, line_no):
     with open(in_file) as _in:
         num = 0
         for line in _in:
-            if num >= line_no:
-                res.append(line)
+            res.append(line)
             num += 1
     return res
 
