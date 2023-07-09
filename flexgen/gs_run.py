@@ -1,6 +1,7 @@
 # coding=utf8
 
 
+import json
 import os
 import argparse
 import subprocess
@@ -60,9 +61,25 @@ def get_args():
     return args
 
 
+def load_dict(out_dir):
+    meta_path = os.path.join(out_dir, 'meta.json')
+    if os.path.exists(meta_path):
+        with open(meta_path) as _out:
+            res = json.load(_out)
+            return res
+    return {}
+
+
+def save_meta(meta_dict, out_dir):
+    meta_path = os.path.join(out_dir, 'meta.json')
+    with open(meta_path, 'w') as _out:
+        json.dump(meta_dict, _out)
+
+
 def main():
     off_args = "--offload-dir /workspace/data/flex_offload_dir"
     args = get_args()
+    meta_dict = load_dict(args.out)
     card_num = 1
     exec_f = 'flex_opt.py'
     pipe_mode = False
@@ -80,7 +97,7 @@ def main():
     context_len = 512
     output_len = 8
     para_list = iter_recursive(get_para_arrs())
-    for bs, num_bs, weight_po, cache_po, act_po, comp in tqdm(para_list):
+    for bs, num_bs, weight_po, cache_po, act_po, comp in para_list:
         policy = ":".join([weight_po, cache_po, act_po])
         act_bs = bs
         if pipe_mode:
@@ -88,7 +105,7 @@ def main():
         f_path = _get_log_path(model_name, pipe_mode, tp_mode, context_len,
                                output_len, act_bs, num_bs, policy, comp, card_num)
         f_path = os.path.join(args.out, f_path)
-        if os.path.exists(f_path):
+        if os.path.exists(f_path) or f_path in meta_dict:
             print(f"the file exits: {f_path}")
             continue
         print(f"starting collect file: {f_path}")
@@ -109,6 +126,8 @@ def main():
         if comp == 1:
             cmd = cmd + " " + "--compress-weight --compress-cache"
         exe_cmd_sync(cmd)
+        meta_dict[f_path] = 'finished'
+        save_meta(meta_dict, args.out)
 
 
 def _get_log_path(model_name, pipe_mode, tp_mode,
