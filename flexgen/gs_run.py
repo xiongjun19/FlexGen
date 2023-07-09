@@ -12,6 +12,7 @@ from subprocess import Popen
 
 def exe_cmd_sync(cmd_line):
     # call is blocking:
+    print(cmd_line)
     cmd_args = shlex.split(cmd_line)
     subprocess.call(cmd_args)
 
@@ -118,9 +119,10 @@ def main():
         if not pipe_mode and tp_mode:
             cmd = f"python {cmd_args} --tp {card_num} "
         elif pipe_mode:
-            cmd = f" mpirun --allow-run-as-root --map-by ppr:{card_num}:node:pe=12 "\
+            cmd = f" mpirun --allow-run-as-root --mca btl_tcp_if_exclude lo,docker0 --mca oob_tcp_if_exclude lo,docker0 --map-by ppr:{card_num}:node:pe=12 "\
                   f" --oversubscribe --bind-to core -x OMP_NUM_THREADS=12 " \
-                  f"python {cmd_args} --use-mpi  --comm-device cpu  "
+                  f"python {cmd_args} --use-mpi  --comm-device cpu --head-ip localhost --port 7777  "
+
         else:
             cmd = f"python {cmd_args} "
         if comp == 1:
