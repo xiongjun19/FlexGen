@@ -1,5 +1,6 @@
 # coding=utf8
 
+import time
 import json
 import os
 import argparse
@@ -41,7 +42,7 @@ def get_keyword(lines):
     return key, start_no
 
 
-def _need_kill(lines, start_no, key):
+def _need_kill(lines, key, start_no):
     if key is None:
         return False
     num = 0

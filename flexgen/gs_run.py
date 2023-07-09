@@ -77,9 +77,9 @@ def save_meta(meta_dict, out_dir):
 
 
 def main():
-    meta_dict = load_dict(args.out)
     off_args = "--offload-dir /workspace/data/flex_offload_dir"
     args = get_args()
+    meta_dict = load_dict(args.out)
     card_num = 1
     exec_f = 'flex_opt.py'
     pipe_mode = False
