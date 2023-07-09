@@ -16,7 +16,9 @@ def exe_cmd_sync(cmd_line):
 
 
 def kill_process(key_word):
-    cmd = f'ps aux | grep flex | grep opt | grep {key_word}'
+    cmd = f"ps aux | grep flex | grep opt | grep {key_word} | " 
+    cmd_part2 = 'awk \'{print $2}\' | xargs kill -9'
+    cmd_line = cmd + cmd_part2
     exe_cmd_sync(cmd_line)
 
 
