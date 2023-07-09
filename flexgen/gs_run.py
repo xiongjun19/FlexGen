@@ -97,7 +97,7 @@ def main():
     context_len = 512
     output_len = 8
     para_list = iter_recursive(get_para_arrs())
-    for bs, num_bs, weight_po, cache_po, act_po, comp in tqdm(para_list):
+    for bs, num_bs, weight_po, cache_po, act_po, comp in para_list:
         policy = ":".join([weight_po, cache_po, act_po])
         act_bs = bs
         if pipe_mode:
