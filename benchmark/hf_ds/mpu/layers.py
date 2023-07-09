@@ -35,7 +35,7 @@ from .random import get_cuda_rng_tracker
 from .utils import divide
 from .utils import split_tensor_along_last_dim
 from .utils import VocabUtility
-from megatron import get_args
+# from megatron import get_args
 import deepspeed.runtime.activation_checkpointing.checkpointing as ds_checkpointing
 from deepspeed.accelerator import get_accelerator
 
