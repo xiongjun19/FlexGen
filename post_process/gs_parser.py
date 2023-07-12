@@ -19,28 +19,29 @@ class ConfigInfo:
     output: str
     device: int = 0
     times: int = 2
+    card_name: str
 
 
 def main(args):
     dir_path = args.input
     out_path = args.output
-    cpu_info_config = ConfigInfo(dir_path, 'out_path_tmp_cpu.json', args.device, args.times)
+    cpu_info_config = ConfigInfo(dir_path, 'out_path_tmp_cpu.json', args.device, args.times, args.card_name)
     lat_th_dict = latency_and_th_parser.main(cpu_info_config, '.txt')
     sheet_name = args.sheet_name
-    _merge_and_save(lat_th_dict, out_path, sheet_name)
+    _merge_and_save(lat_th_dict, out_path, sheet_name, card_name)
 
 
-def _merge_and_save(lat_th_dict, out_path, sheet_name):
-    df = _merge_to_df(lat_th_dict)
+def _merge_and_save(lat_th_dict, out_path, sheet_name, card_name):
+    df = _merge_to_df(lat_th_dict, card_name)
     df.to_excel(out_path, index=False)
 
 
-def _merge_to_df(lat_th_dict):
-    df = _cvt_to_df(lat_th_dict)
+def _merge_to_df(lat_th_dict, card_name):
+    df = _cvt_to_df(lat_th_dict, card_name)
     return df
 
 
-def _cvt_to_df(_dict):
+def _cvt_to_df(_dict, card_name):
     key_map = {
             'util': 'GPU_Util',
             'mem': 'io_time_ratio',
@@ -69,6 +70,8 @@ def _cvt_to_df(_dict):
             if new_key not in res:
                 res[new_key] = []
             res[new_key].append(val)
+    card_arr = [card_name] * len(res['model_name'])
+    res['card_name'] = card_arr
     df = pd.DataFrame.from_dict(res)
     return df
 
