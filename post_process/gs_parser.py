@@ -17,18 +17,19 @@ import cpu_info_parser
 class ConfigInfo:
     input: str
     output: str
+    card_name: str
     device: int = 0
     times: int = 2
-    card_name: str
 
 
 def main(args):
     dir_path = args.input
     out_path = args.output
-    cpu_info_config = ConfigInfo(dir_path, 'out_path_tmp_cpu.json', args.device, args.times, args.card_name)
+    cpu_info_config = ConfigInfo(dir_path, 'out_path_tmp_cpu.json',
+            args.card_name, args.device, args.times)
     lat_th_dict = latency_and_th_parser.main(cpu_info_config, '.txt')
     sheet_name = args.sheet_name
-    _merge_and_save(lat_th_dict, out_path, sheet_name, card_name)
+    _merge_and_save(lat_th_dict, out_path, sheet_name, cpu_info_config.card_name)
 
 
 def _merge_and_save(lat_th_dict, out_path, sheet_name, card_name):
@@ -111,6 +112,7 @@ if __name__ == '__main__':
     parser.add_argument('--device', type=int,  default=0)
     parser.add_argument('--times', type=int,  default=2)
     parser.add_argument('--sheet_name', type=str, default='sheet1')
+    parser.add_argument('--card_name', type=str, default='A10')
     t_args = parser.parse_args()
     main(t_args)
 
