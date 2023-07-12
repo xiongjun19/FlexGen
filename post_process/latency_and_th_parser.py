@@ -5,12 +5,12 @@ import json
 import argparse
 
 
-def main(args):
+def main(args, end_suffix='.txt.org'):
     dir_path = args.input
     out_path = args.output
     res = dict()
     f_names = os.listdir(dir_path)
-    end_suffix = '.txt.org'
+    # end_suffix = '.txt.org'
     for f_name in f_names:
         if f_name.endswith(end_suffix):
             f_path = os.path.join(dir_path, f_name)
