@@ -1,0 +1,5 @@
+numpy
+bokeh
+pynvml
+tabulate
+psutil
