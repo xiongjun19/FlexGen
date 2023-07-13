@@ -1,4 +1,8 @@
 To test GPU and Memory to/from bandwidth test run:
 `python main.py`
 To perform GPU and NVME to/from bandwidth run the following 
-`python run_gds.py`
+`python run_gds.py`. The output 
+
+If no error the output will be
+```python display_gds.py```
+```Output saved to output_gds.csv```
