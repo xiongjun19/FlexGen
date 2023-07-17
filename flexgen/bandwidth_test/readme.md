@@ -6,3 +6,6 @@ To perform GPU and NVME to/from bandwidth run the following
 If no error the output will be
 ```python display_gds.py```
 ```Output saved to output_gds.csv```
+
+
+To test the bandwidth and latency with respect to CPUs use mlc and stream benchmarks as provided 
