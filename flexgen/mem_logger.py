@@ -7,7 +7,8 @@ from tabulate import tabulate
 import random
 import numpy as np
 import os, sys
-
+import subprocess
+import re
 from pynvml.smi import nvidia_smi
 import signal
 
@@ -28,7 +29,32 @@ except Exception as e:
     name='test.csv'
 
 os.makedirs('online',exist_ok=True)
-
+def extract_pmemory_usage():
+    command = "mvmcli show-usage"
+    output = subprocess.check_output(command, shell=True, text=True)
+    
+    # Regular expressions to extract the required information
+    dram_total_pattern = r"Managed DRAM\(MiB\): Total (\d+\.\d+)"
+    dram_used_pattern = r"DRAM\(MiB\): Total \d+\.\d+, Used (\d+\.\d+)"
+    pmem_total_pattern = r"Managed PMEM\(MiB\): Total (\d+\.\d+)"
+    pmem_used_pattern = r"PMEM\(MiB\): Total \d+\.\d+, Used (\d+\.\d+)"
+    
+    # Extract total DRAM and used DRAM values
+    dram_total_match = re.search(dram_total_pattern, output)
+    dram_used_match = re.search(dram_used_pattern, output)
+    
+    # Extract total PMEM and used PMEM values
+    pmem_total_match = re.search(pmem_total_pattern, output)
+    pmem_used_match = re.search(pmem_used_pattern, output)
+    
+    if dram_total_match and dram_used_match and pmem_total_match and pmem_used_match:
+        dram_total = float(dram_total_match.group(1))
+        dram_used = float(dram_used_match.group(1))
+        pmem_total = float(pmem_total_match.group(1))
+        pmem_used = float(pmem_used_match.group(1))
+        return dram_total, dram_used, pmem_total, pmem_used
+    
+    return None
 def get_max_memory_info(node_id):
     with open('/proc/zoneinfo', 'r') as f:
         content = f.read()
@@ -150,6 +176,16 @@ def get_traces(idx):
     ram_percent = psutil.virtual_memory().percent
     gpu_percent,gpumem_percent,pci_tx,pci_rx,product,product_gen, gpumem_used, gpumem_total,performance_state,gpu_temperature = get_gpu_info(info[idx])
     memory_info = get_memory_info()
+    pmem_used= 0
+    try:
+        memory_usage = extract_pmemory_usage()
+        if memory_usage:
+            _, _, pmem_total, pmem_used = memory_usage
+    except Exception as e:
+        print('Warning mvmcli can be ignored if not using Memverge',e)
+        # import pdb;pdb.set_trace()
+        pass
+        
     dma_free = memory_info[(0,'DMA')]
     dma32_free = memory_info[(0,'DMA32')]
     normal_free = memory_info[(0,'Normal')]
@@ -170,7 +206,7 @@ def get_traces(idx):
     else:
         cxl_percent = 100*used_exmem/(used_exmem+exmem_free)
     
-    string = f"{current_time},{idx},{cpu_percent},{ram_percent},{gpu_percent},{gpumem_percent},{cxl_percent},{pci_tx},{pci_rx},{product},{product_gen},{gpumem_used}, {gpumem_total},{performance_state},{gpu_temperature}"
+    string = f"{current_time},{idx},{cpu_percent},{ram_percent},{gpu_percent},{gpumem_percent},{cxl_percent},{pci_tx},{pci_rx},{product},{product_gen},{gpumem_used},{gpumem_total},{pmem_used},{performance_state},{gpu_temperature}"
     print(string,file=open(f'online/{name}-gpu-{idx}.csv', 'a'))
     print(string)
 
@@ -178,9 +214,9 @@ def get_traces(idx):
 info  = nvsmi.DeviceQuery()['gpu']
 my_gpus_ids_to_monitor = [0]
 for idx in my_gpus_ids_to_monitor:
-    print(f"TIME,GPU_ID,CPU%,MEM%,GPU%,GPUMEM%,CXLMEM%,PCI_TX_MBps,PCI_RX_MBps,PRODUCT,PCI_INFO,GPUMEM_USED_MB, GPUMEM_TOTAL_MB,PERFORMANCE_STATE,GPU_TEMPERATURE_C",file=open(f'online/{name}-gpu-{idx}.csv', 'w'))
+    print(f"TIME,GPU_ID,CPU%,MEM%,GPU%,GPUMEM%,CXLMEM%,PCI_TX_MBps,PCI_RX_MBps,PRODUCT,PCI_INFO,GPUMEM_USED_MB,GPUMEM_TOTAL_MB,CXL_PMEM_USED_MB,PERFORMANCE_STATE,GPU_TEMPERATURE_C",file=open(f'online/{name}-gpu-{idx}.csv', 'w'))
 
-sample_interval = 0.95 # seconds
+sample_interval = 0.99 # seconds
 
 while True:
     info  = nvsmi.DeviceQuery()['gpu']
@@ -191,7 +227,9 @@ while True:
             message = file.read().strip()
         if message == 'stop' or ('stop' in message):
             break
-    time.sleep(0.95)
+    time.sleep(sample_interval)
 print('Memlogger Stopped!!!')
+os.remove('message.txt')
 sys.exit()
+
     
