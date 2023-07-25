@@ -171,6 +171,7 @@ def get_gpu_info(info):
     else:
         assert 0 , "units check please"
 def get_traces(idx):
+    MODE = 'CXL'
     current_time = time.strftime('%Y-%m-%d %H:%M:%S')
     cpu_percent = psutil.cpu_percent()
     ram_percent = psutil.virtual_memory().percent
@@ -206,7 +207,7 @@ def get_traces(idx):
     else:
         cxl_percent = 100*used_exmem/(used_exmem+exmem_free)
     
-    string = f"{current_time},{idx},{cpu_percent},{ram_percent},{gpu_percent},{gpumem_percent},{cxl_percent},{pci_tx},{pci_rx},{product},{product_gen},{gpumem_used},{gpumem_total},{pmem_used},{performance_state},{gpu_temperature}"
+    string = f"{current_time},{idx},{cpu_percent},{ram_percent},{gpu_percent},{gpumem_percent},{cxl_percent},{pci_tx},{pci_rx},{product},{product_gen},{gpumem_used},{gpumem_total},{pmem_used},{performance_state},{gpu_temperature},{MODE}"
     print(string,file=open(f'online/{name}-gpu-{idx}.csv', 'a'))
     print(string)
 
@@ -214,7 +215,7 @@ def get_traces(idx):
 info  = nvsmi.DeviceQuery()['gpu']
 my_gpus_ids_to_monitor = [0]
 for idx in my_gpus_ids_to_monitor:
-    print(f"TIME,GPU_ID,CPU%,MEM%,GPU%,GPUMEM%,CXLMEM%,PCI_TX_MBps,PCI_RX_MBps,PRODUCT,PCI_INFO,GPUMEM_USED_MB,GPUMEM_TOTAL_MB,CXL_PMEM_USED_MB,PERFORMANCE_STATE,GPU_TEMPERATURE_C",file=open(f'online/{name}-gpu-{idx}.csv', 'w'))
+    print(f"TIME,GPU_ID,CPU%,MEM%,GPU%,GPUMEM%,CXLMEM%,PCI_TX_MBps,PCI_RX_MBps,PRODUCT,PCI_INFO,GPUMEM_USED_MB,GPUMEM_TOTAL_MB,CXL_PMEM_USED_MB,PERFORMANCE_STATE,GPU_TEMPERATURE_C,MODE",file=open(f'online/{name}-gpu-{idx}.csv', 'w'))
 
 sample_interval = 0.99 # seconds
 
