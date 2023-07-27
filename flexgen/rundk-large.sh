@@ -81,13 +81,14 @@ while [[ $# -gt 0 ]]; do
 
 
             # Set the memory maximum size for the control group
-            MEMSIZE_MB= 50000 #90000->1.65 #80000->1.671
+            MEMSIZE_MB=80000 #90000->1.65 #80000->1.671 #use above 80000
             # Calculate the memory limit in bytes based on the memory size
             CGROUP_MEM_BYTES=$((MEMSIZE_MB*1024**2))
 
             # Set the memory limit for the control group
             sudo echo "${CGROUP_MEM_BYTES}" > "/sys/fs/cgroup/memory/${CGROUP_NAME}/memory.limit_in_bytes"
             
+            # BLKIO NOT EFFECTIVE DONT USE
             # # Set the blkio throttle read and write limits for the control group
             # BLKIO_THROTTLE_BPS=1874848768 
             # # Set the read bps limit

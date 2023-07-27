@@ -1,4 +1,38 @@
 There are multiple options to run the demo, but before running we need to start the 
-ui server. For this open up a terminal and activate the conda environment. Please make sure that in 
+ui server. 
 
+For this open up a terminal and activate the conda environment. Please make sure that execute the script as:
+
+cd FlexGen/project_v4/
+python serv/main.py
+
+and wait then run the application by going to a new Terminal and then,
+
+
+cd FlexGen/flexgen
+sudo chmod +x rundk-large.sh 
+./rundk-large.sh --cxl-offload
+
+
+You can kill the process by using general Cltr + C key and keep it pressing until you see Memlogger Stopped!!!
+The Stopped message will come soon, if it does not come after a while then close the Terminal and use a new one, it will only happen in case of some sever performance degradation simulation. 
+
+
+You can also try :
+
+./rundk-large.sh --memverge-offload
+
+wait for the memverge to start its service and it will take up all cxl memory and then it will run. The UI will auto take the data 
+
+You can also try :
+
+./rundk-large.sh --normal-offload
+
+
+You can wait for the first time in the Browser. 
+Use these links:
+
+http://127.0.0.1:9980/#/screen1
+
+http://127.0.0.1:9980/#/screen2
 
