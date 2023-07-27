@@ -14,12 +14,12 @@ if [ "$COUNT" -eq -1 ]; then
     echo "Running $RUN_SCRIPT script infinitely..."
     while true; do
         run_script
-        sleep 5
+        sleep 2
     done
 else
     echo "Running $RUN_SCRIPT script $COUNT times..."
     for ((i = 1; i <= COUNT; i++)); do
         run_script
-        sleep 5
+        sleep 2
     done
 fi

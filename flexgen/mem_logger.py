@@ -170,22 +170,22 @@ def get_gpu_info(info):
         return gpu,gpumem, pci_tx,pci_rx, product,product_gen, gpumem_used, gpumem_total, perfomance_state,gpu_temperature
     else:
         assert 0 , "units check please"
-def get_traces(idx):
-    MODE = 'CXL'
+def get_traces(idx,MODE = 'CXL'):
     current_time = time.strftime('%Y-%m-%d %H:%M:%S')
     cpu_percent = psutil.cpu_percent()
     ram_percent = psutil.virtual_memory().percent
     gpu_percent,gpumem_percent,pci_tx,pci_rx,product,product_gen, gpumem_used, gpumem_total,performance_state,gpu_temperature = get_gpu_info(info[idx])
     memory_info = get_memory_info()
     pmem_used= 0
-    try:
-        memory_usage = extract_pmemory_usage()
-        if memory_usage:
-            _, _, pmem_total, pmem_used = memory_usage
-    except Exception as e:
-        print('Warning mvmcli can be ignored if not using Memverge',e)
-        # import pdb;pdb.set_trace()
-        pass
+    if MODE =='MEMVERGE':
+        try:
+            memory_usage = extract_pmemory_usage()
+            if memory_usage:
+                _, _, pmem_total, pmem_used = memory_usage
+        except Exception as e:
+            print('Warning mvmcli can be ignored if not using Memverge',e)
+            # import pdb;pdb.set_trace()
+            pass
         
     dma_free = memory_info[(0,'DMA')]
     dma32_free = memory_info[(0,'DMA32')]
@@ -211,6 +211,14 @@ def get_traces(idx):
     print(string,file=open(f'online/{name}-gpu-{idx}.csv', 'a'))
     print(string)
 
+def get_mode_info(text):
+    mode_list = ['cxl','disk','memverge','mem','mem1']
+    for mode in mode_list:
+        if mode in text:
+            return mode
+        
+    
+        
 
 info  = nvsmi.DeviceQuery()['gpu']
 my_gpus_ids_to_monitor = [0]
@@ -221,13 +229,16 @@ sample_interval = 0.99 # seconds
 
 while True:
     info  = nvsmi.DeviceQuery()['gpu']
-    for idx in my_gpus_ids_to_monitor:
-        get_traces(idx)
     if os.path.exists('message.txt'):
         with open('message.txt', 'r') as file:
             message = file.read().strip()
         if message == 'stop' or ('stop' in message):
             break
+    MODE = get_mode_info(message)
+        
+    for idx in my_gpus_ids_to_monitor:
+        get_traces(idx,MODE.upper())
+        
     time.sleep(sample_interval)
 print('Memlogger Stopped!!!')
 os.remove('message.txt')
