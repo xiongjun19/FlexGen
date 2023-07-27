@@ -1,3 +1,5 @@
+We have updated the script so now it needs to run outside Docker container.
+
 There are multiple options to run the demo, but before running we need to start the 
 ui server. 
 
