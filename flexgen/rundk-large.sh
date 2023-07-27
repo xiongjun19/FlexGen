@@ -113,7 +113,7 @@ while [[ $# -gt 0 ]]; do
             # Set the memory type to "normal" and the memory set to 0
             if [ $MEM_SET -eq 0 ]; then
                 
-                PYTHON=/home/ahussain/miniconda3/envs/ui38/bin/python # use outside docker
+                
                 echo "stop" > message.txt
                 echo "start memverge" > message.txt
                 log_file='OPT-66b-MEMVERGE-OUTPUT.log'
@@ -131,7 +131,7 @@ while [[ $# -gt 0 ]]; do
         --memverge-offload-scan)
             # Set the memory type to "normal" and the memory set to 0
             if [ $MEM_SET -eq 0 ]; then
-            PYTHON=/home/ahussain/miniconda3/envs/ui38/bin/python # use outside docker
+            
             # Define an array with the percentages
             percentages=("01" "10" "20" "30" "40" "50" "60" "70" "80" "90" "100")
             
