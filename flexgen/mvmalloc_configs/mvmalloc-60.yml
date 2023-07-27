@@ -1,0 +1,16 @@
+## mvmalloc parameters
+
+
+
+DpmeSocketName: /tmp/dpme_daemon.0
+MmapCapture: true
+MallocCapture: true
+LogName: /home/ahussain/azr/workspace/mm/single_malloc_log
+LogNamePrefix: /home/ahussain/azr/workspace/mm/malloc_log
+LogTrace: false
+CommPort: 5678
+EnableSnapshot: true
+HugePageDram: false
+HugePagePath: /dev/hugepages/dax0
+PreallocateDram: false
+DramTierGB: 65
