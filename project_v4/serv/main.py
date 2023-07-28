@@ -16,7 +16,7 @@ previous_cxl_throughput_data =None
 flag_cxl=False
 flag_progress=False
 flag_throughput = False
-MAX_THROUGHPUT = 7 # IMPORTANT TO SHOW CIRCULAR PROGRESS INITIAL, BUT WILL BE AUTO CHANGE
+MAX_THROUGHPUT = 6 # IMPORTANT TO SHOW CIRCULAR PROGRESS INITIAL, BUT WILL BE AUTO CHANGE
 MODE_SYNTHETIC = False
 CXL_LENGTH=0
 my_mode = 'cxl'
@@ -27,7 +27,7 @@ def get_mode_info():
     if os.path.exists(message_path):
         with open(message_path, 'r') as file:
             my_mode = file.read().strip()
-    mode_list = ['cxl','disk','memverge','mem','mem1']
+    mode_list = ['cxl-sim','cxl','disk','memverge','mem','mem1']
     for mode in mode_list:
         if mode in my_mode:
             return mode

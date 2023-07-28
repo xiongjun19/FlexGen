@@ -212,7 +212,7 @@ def get_traces(idx,MODE = 'CXL'):
     print(string)
 
 def get_mode_info(text):
-    mode_list = ['cxl','disk','memverge','mem','mem1']
+    mode_list = ['cxl-sim','cxl','disk','memverge','mem','mem1']
     for mode in mode_list:
         if mode in text:
             return mode
