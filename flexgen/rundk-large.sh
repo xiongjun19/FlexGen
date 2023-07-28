@@ -61,6 +61,7 @@ MEM_SET=0
 CMD=''
 PORT=9808
 batch_size=24
+sudo service redis stop
 sudo rm -rf message.txt
 sudo $SCRIPT_PATH/stopmm.sh
 # echo 'Max blkio'
