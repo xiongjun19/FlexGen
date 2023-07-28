@@ -39,7 +39,7 @@ getconf -a | grep PAGE_SIZE
 
 
 directory="tmp"
-
+sudo rm -rf tmp
 # Check if the directory exists
 if [ ! -d "$directory" ]; then
   echo "Creating $directory directory..."
