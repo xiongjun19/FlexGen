@@ -9,6 +9,8 @@ readonly BASEDIR=$(readlink -f "$(dirname "$0")")/../../..
 # Get the absolute path of the script's directory and set it as the app path
 SCRIPT_PATH=$(readlink -f "$(dirname "$0")")/
 
+
+
 # Drop cache
 # free && sync && echo 3 > /proc/sys/vm/drop_caches && free
 # echo 1 > /proc/sys/vm/drop_caches
@@ -18,6 +20,7 @@ SCRIPT_PATH=$(readlink -f "$(dirname "$0")")/
 # Set the memory type to "cxl" by default
 MEMTYPE=cxl
 
+current_user=$(whoami)
 
 
 # Set the directory to store the results
@@ -67,23 +70,34 @@ sudo blockdev --getsize /dev/nvme0n1p2
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --cxl-offload)
+            if [ $MEM_SET -eq 0 ]; then
+                MEMTYPE=cxl
+                MEM_SET=2
+                log_file='OPT-66b-CXL-OUTPUT.log'
+                echo "stop" > message.txt
+                echo "start cxl" > message.txt
+                $PYTHON mem_logger.py online_cxl.csv &
+                numactl --interleave=$MEM_SET  $PYTHON flex_opt.py --model facebook/opt-66b --offload-dir /workspace/data/flex_offload_dir --path _DUMMY_ --percent 0 100 0 100 0 100 --gpu-batch-size ${batch_size} --num-gpu-batches 4 --prompt-len 512 --gen-len 8 --compress-weight --compress-cache --log-file ${log_file}
+                echo "stop" > message.txt
+                
+            fi
+            shift
+            ;;
+        --cxl-offload-sim)
             # Set the memory type to "cxl" and the memory set to 1
-            CGROUP_NAME=cxl_control
+            CGROUP_NAME="cxl_control_${current_user}"
             # Check whether the memory control group exists and create it if it doesn't
             if [ ! -d "/sys/fs/cgroup/memory/${CGROUP_NAME}" ]; then
                 sudo cgcreate -a "$USER:$USER" -g memory:"${CGROUP_NAME}"
             fi
-
             # Check whether the blkio control group exists and create it if it doesn't
             if [ ! -d "/sys/fs/cgroup/blkio/${CGROUP_NAME}" ]; then
                 sudo cgcreate -a "$USER:$USER" -g blkio:"${CGROUP_NAME}"
             fi
-
-
             # Set the memory maximum size for the control group
-            MEMSIZE_MB=80000 #90000->1.65 #80000->1.671 #use above 80000
+            MEMSIZE_B=70000 #70000->0.842  #90000->1.65 #80000->1.671 # better use above 80000
             # Calculate the memory limit in bytes based on the memory size
-            CGROUP_MEM_BYTES=$((MEMSIZE_MB*1024**2))
+            CGROUP_MEM_BYTES=$((MEMSIZE_B*1024**2))
 
             # Set the memory limit for the control group
             sudo echo "${CGROUP_MEM_BYTES}" > "/sys/fs/cgroup/memory/${CGROUP_NAME}/memory.limit_in_bytes"
@@ -99,10 +113,10 @@ while [[ $# -gt 0 ]]; do
             if [ $MEM_SET -eq 0 ]; then
                 MEMTYPE=cxl
                 MEM_SET=2
-                log_file='OPT-66b-CXL-OUTPUT.log'
+                log_file='OPT-66b-CXL-SIM-OUTPUT.log'
                 echo "stop" > message.txt
-                echo "start cxl" > message.txt
-                $PYTHON mem_logger.py online_cxl.csv &
+                echo "start cxl-sim" > message.txt
+                $PYTHON mem_logger.py online_cxl-sim.csv &
                 sudo cgexec -g memory:${CGROUP_NAME} numactl --interleave=$MEM_SET  $PYTHON flex_opt.py --model facebook/opt-66b --offload-dir /workspace/data/flex_offload_dir --path _DUMMY_ --percent 0 100 0 100 0 100 --gpu-batch-size ${batch_size} --num-gpu-batches 4 --prompt-len 512 --gen-len 8 --compress-weight --compress-cache --log-file ${log_file}
                 echo "stop" > message.txt
                 
@@ -174,7 +188,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         
         --normal1-offload)
-            # Set the memory type to "normal" and the memory set to 0
+            # Set the memory type to "normal" and the memory set to 1
             if [ $MEM_SET -eq 0 ]; then
                 MEMTYPE=normal
                 MEM_SET=1
