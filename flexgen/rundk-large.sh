@@ -52,7 +52,7 @@ fi
 
 # Define a usage function
 function usage(){
-    echo "Usage: $0 [ --cxl-offload | --normal-offload | --disk-offload | --normal1-offload]"
+    echo "Usage: $0 [ --cxl-offload | --cxl-offload-sim | --memverge-offload | --normal-offload | --disk-offload | --normal1-offload]"
     exit 2
 }
 
@@ -95,7 +95,7 @@ while [[ $# -gt 0 ]]; do
                 sudo cgcreate -a "$USER:$USER" -g blkio:"${CGROUP_NAME}"
             fi
             # Set the memory maximum size for the control group
-            MEMSIZE_B=70000 #70000->0.842  #90000->1.65 #80000->1.671 # better use above 80000
+            MEMSIZE_B=80000 #70000->0.842  #90000->1.65 #80000->1.671 # better use above 80000
             # Calculate the memory limit in bytes based on the memory size
             CGROUP_MEM_BYTES=$((MEMSIZE_B*1024**2))
 
@@ -132,8 +132,8 @@ while [[ $# -gt 0 ]]; do
                 echo "start memverge" > message.txt
                 log_file='OPT-66b-MEMVERGE-OUTPUT.log'
                 sudo $SCRIPT_PATH/stopmm.sh
-                sudo $SCRIPT_PATH/startmm.sh
                 $PYTHON mem_logger.py online_memverge.csv &
+                sudo $SCRIPT_PATH/startmm.sh
                 percentage=60
                 sudo /opt/memverge/bin/mm --config $SCRIPT_PATH/mvmalloc_configs/mvmalloc-${percentage}.yml $PYTHON flex_opt.py --model facebook/opt-66b --offload-dir tmp/data/flex_offload_dir --path _DUMMY_ --percent 0 100 0 100 0 100 --gpu-batch-size ${batch_size} --num-gpu-batches 4 --prompt-len 512 --gen-len 8 --compress-weight --compress-cache --log-file ${log_file}
                 echo "stop" > message.txt
