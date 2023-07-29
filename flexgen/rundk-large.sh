@@ -9,19 +9,10 @@ readonly BASEDIR=$(readlink -f "$(dirname "$0")")/../../..
 # Get the absolute path of the script's directory and set it as the app path
 SCRIPT_PATH=$(readlink -f "$(dirname "$0")")/
 
-
-
-# Drop cache
-# free && sync && echo 3 > /proc/sys/vm/drop_caches && free
-# echo 1 > /proc/sys/vm/drop_caches
-# echo 2 > /proc/sys/vm/drop_caches
-# echo 3 > /proc/sys/vm/drop_caches
-
 # Set the memory type to "cxl" by default
 MEMTYPE=cxl
 
 current_user=$(whoami)
-
 
 # Set the directory to store the results
 RESULTS_DIR=./results
@@ -47,6 +38,7 @@ if [ ! -d "$directory" ]; then
   echo "Directory created successfully."
 else
   echo "$directory directory already exists."
+  
 fi
 
 
@@ -63,10 +55,11 @@ PORT=9808
 batch_size=24
 sudo service redis stop
 sudo rm -rf message.txt
+sudo chmod +x $SCRIPT_PATH/startmm.sh
+sudo chmod +x $SCRIPT_PATH/stopmm.sh
 sudo $SCRIPT_PATH/stopmm.sh
 # echo 'Max blkio'
 # sudo blockdev --getsize /dev/nvme0n1p2
-
 # Parse command-line options
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -204,8 +197,24 @@ while [[ $# -gt 0 ]]; do
             ;;
         
         --disk-offload)
-            # Set the memory type to "cxl" and the memory set to 2
+            # Set the memory type 
             if [ $MEM_SET -eq 0 ]; then
+                    # Set the memory type to "cxl" and the memory set to 1
+                CGROUP_NAME="disk_control_${current_user}"
+                # Check whether the memory control group exists and create it if it doesn't
+                if [ ! -d "/sys/fs/cgroup/memory/${CGROUP_NAME}" ]; then
+                    sudo cgcreate -a "$USER:$USER" -g memory:"${CGROUP_NAME}"
+                fi
+                # Check whether the blkio control group exists and create it if it doesn't
+                if [ ! -d "/sys/fs/cgroup/blkio/${CGROUP_NAME}" ]; then
+                    sudo cgcreate -a "$USER:$USER" -g blkio:"${CGROUP_NAME}"
+                fi
+                # This limit will make sure that Disk will not use more than 20GB of memory and disk-offloading will not use any cached data
+                MEMSIZE_B=20000
+                # Calculate the memory limit in bytes based on the memory size
+                CGROUP_MEM_BYTES=$((MEMSIZE_B*1024**2))
+                # Set the memory limit for the control group
+                sudo echo "${CGROUP_MEM_BYTES}" > "/sys/fs/cgroup/memory/${CGROUP_NAME}/memory.limit_in_bytes"
                 MEMTYPE=disk
                 CMD='--disk-offload'
                 MEM_SET=0
@@ -213,7 +222,7 @@ while [[ $# -gt 0 ]]; do
                 echo "start disk" > message.txt
                 $PYTHON mem_logger.py online_disk.csv &
                 log_file='OPT-66b-DISK-OUTPUT.log'
-                sudo numactl --interleave=$MEM_SET $PYTHON flex_opt.py --model facebook/opt-66b --offload-dir tmp/data/flex_offload_dir --path _DUMMY_ --percent 0 0 0 0 0 100 --gpu-batch-size ${batch_size} --num-gpu-batches 4 --prompt-len 512 --gen-len 8 --compress-weight --compress-cache --log-file ${log_file}
+                sudo cgexec -g memory:${CGROUP_NAME} $PYTHON flex_opt.py --model facebook/opt-66b --offload-dir tmp/data/flex_offload_dir --path _DUMMY_ --percent 0 0 0 0 0 100 --gpu-batch-size ${batch_size} --num-gpu-batches 4 --prompt-len 512 --gen-len 8 --compress-weight --compress-cache --log-file ${log_file}
                 echo "stop" > message.txt
             fi
             shift
