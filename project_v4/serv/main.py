@@ -35,12 +35,16 @@ def get_mode_info():
 
 
 def get_paths():
+    global my_mode
     MODE = get_mode_info()
     MODE_UPPER='CXL'
     try:
         MODE_UPPER = MODE.upper()
     except:
         print('NO RUNNING WORKLOAD FOUND!!!')
+        MODE = my_mode
+        MODE_UPPER = MODE.upper()
+        
     # Actual One 
     history_cxl_filepath=f'../../FlexGen/flexgen/history-21july-b24/online_{MODE}.csv-gpu-0.csv'
     online_cxl_filepath=f'../../FlexGen/flexgen/online/online_{MODE}.csv-gpu-0.csv'
