@@ -57,6 +57,7 @@ sudo service redis stop
 sudo rm -rf message.txt
 sudo chmod +x $SCRIPT_PATH/startmm.sh
 sudo chmod +x $SCRIPT_PATH/stopmm.sh
+sudo $SCRIPT_PATH/startmm.sh
 sudo $SCRIPT_PATH/stopmm.sh
 # echo 'Max blkio'
 # sudo blockdev --getsize /dev/nvme0n1p2
@@ -105,7 +106,7 @@ while [[ $# -gt 0 ]]; do
             # echo "8:0 ${BLKIO_THROTTLE_BPS}" | sudo tee "/sys/fs/cgroup/blkio/${CGROUP_NAME}/blkio.throttle.write_bps_device"
 
             if [ $MEM_SET -eq 0 ]; then
-                MEMTYPE=cxl
+                MEMTYPE=cxl-sim
                 MEM_SET=2
                 log_file='OPT-66b-CXL-SIM-OUTPUT.log'
                 echo "stop" > message.txt
