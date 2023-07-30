@@ -174,7 +174,7 @@ while [[ $# -gt 0 ]]; do
                 echo "stop" > message.txt
                 echo "start mem" > message.txt
                 $PYTHON mem_logger.py online_mem.csv &
-                log_file='OPT-66b-NORMAL-OUTPUT.log'
+                log_file='OPT-66b-MEM-OUTPUT.log'
                 sudo numactl --interleave=$MEM_SET $PYTHON flex_opt.py --model facebook/opt-66b --offload-dir tmp/data/flex_offload_dir --path _DUMMY_ --percent 0 100 0 100 0 100 --gpu-batch-size ${batch_size} --num-gpu-batches 4 --prompt-len 512 --gen-len 8 --compress-weight --compress-cache --log-file ${log_file}
                 echo "stop" > message.txt
             fi
@@ -189,7 +189,7 @@ while [[ $# -gt 0 ]]; do
                 echo "stop" > message.txt
                 echo "start mem1" > message.txt
                 $PYTHON mem_logger.py online_mem1.csv &
-                log_file='OPT-66b-NORMAL1-OUTPUT.log'
+                log_file='OPT-66b-MEM1-OUTPUT.log'
                 sudo numactl --interleave=$MEM_SET $PYTHON flex_opt.py --model facebook/opt-66b --offload-dir tmp/data/flex_offload_dir --path _DUMMY_ --percent 0 100 0 100 0 100 --gpu-batch-size ${batch_size} --num-gpu-batches 4 --prompt-len 512 --gen-len 8 --compress-weight --compress-cache --log-file ${log_file}
                 echo "stop" > message.txt
             fi
