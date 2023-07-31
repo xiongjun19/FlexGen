@@ -57,10 +57,13 @@ sudo service redis stop
 sudo rm -rf message.txt
 sudo chmod +x $SCRIPT_PATH/startmm.sh
 sudo chmod +x $SCRIPT_PATH/stopmm.sh
-sudo $SCRIPT_PATH/startmm.sh
+echo "Check Memverge status..."
+
+# Following two steps are very important to stop the machine if it is already started.
+# The reason to add starmm.sh is to ensure a fail-safe mechanism to gracefully shutdown the mm.
+sudo $SCRIPT_PATH/startmm.sh 
 sudo $SCRIPT_PATH/stopmm.sh
-# echo 'Max blkio'
-# sudo blockdev --getsize /dev/nvme0n1p2
+
 # Parse command-line options
 while [[ $# -gt 0 ]]; do
     case "$1" in
