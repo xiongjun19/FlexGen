@@ -206,8 +206,8 @@ def get_traces(idx,MODE = 'CXL'):
         cxl_percent = 0
     else:
         cxl_percent = 100*used_exmem/(used_exmem+exmem_free)
-    if MODE=='DISK':
-        MODE="DISK'"
+    
+    MODE=MODE+".LIVE"
     string = f"{current_time},{idx},{cpu_percent},{ram_percent},{gpu_percent},{gpumem_percent},{cxl_percent},{pci_tx},{pci_rx},{product},{product_gen},{gpumem_used},{gpumem_total},{pmem_used},{performance_state},{gpu_temperature},{MODE}"
     print(string,file=open(f'online/{name}-gpu-{idx}.csv', 'a'))
     print(string)
