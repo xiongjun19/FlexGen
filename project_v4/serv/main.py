@@ -27,7 +27,7 @@ def get_mode_info():
     if os.path.exists(message_path):
         with open(message_path, 'r') as file:
             my_mode = file.read().strip()
-    mode_list = ['cxl-sim','cxl','disk','memverge','mem','mem1']
+    mode_list = ['cxl-sim','cxl','disk','memverge','mem','mem1','all']
     mode  =  my_mode.split()[-1]
     my_mode = mode
     print("[INFO] CURRENT MODE ===> ",my_mode)

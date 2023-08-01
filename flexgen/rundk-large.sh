@@ -132,7 +132,7 @@ while [[ $# -gt 0 ]]; do
                 sudo $SCRIPT_PATH/stopmm.sh
                 $PYTHON mem_logger.py online_memverge.csv &
                 sudo $SCRIPT_PATH/startmm.sh
-                percentage=60
+                percentage=10
                 sudo /opt/memverge/bin/mm --config $SCRIPT_PATH/mvmalloc_configs/mvmalloc-${percentage}.yml $PYTHON flex_opt.py --model facebook/opt-66b --offload-dir tmp/data/flex_offload_dir --path _DUMMY_ --percent 0 100 0 100 0 100 --gpu-batch-size ${batch_size} --num-gpu-batches 4 --prompt-len 512 --gen-len 8 --compress-weight --compress-cache --log-file ${log_file}
                 echo "stop" > message.txt
                 
@@ -184,11 +184,24 @@ while [[ $# -gt 0 ]]; do
             fi
             shift
             ;;
-        
+        --all-offload)
+            # Set the memory type to "all" to use about 26% of CXL memory and rest others by interleaving all
+            if [ $MEM_SET -eq 0 ]; then
+                MEMTYPE=normal+cxl
+                MEM_SET=0
+                echo "stop" > message.txt
+                echo "start all" > message.txt
+                $PYTHON mem_logger.py online_all.csv &
+                log_file='OPT-66b-ALL-OUTPUT.log'
+                sudo numactl --interleave=0,1,2 $PYTHON flex_opt.py --model facebook/opt-66b --offload-dir tmp/data/flex_offload_dir --path _DUMMY_ --percent 0 100 0 100 0 100 --gpu-batch-size ${batch_size} --num-gpu-batches 4 --prompt-len 512 --gen-len 8 --compress-weight --compress-cache --log-file ${log_file}
+                echo "stop" > message.txt
+            fi
+            shift
+            ;;
         --normal1-offload)
             # Set the memory type to "normal" and the memory set to 1
             if [ $MEM_SET -eq 0 ]; then
-                MEMTYPE=normal
+                MEMTYPE=normal1
                 MEM_SET=1
                 echo "stop" > message.txt
                 echo "start mem1" > message.txt
