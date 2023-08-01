@@ -207,16 +207,23 @@ def get_traces(idx,MODE = 'CXL'):
     else:
         cxl_percent = 100*used_exmem/(used_exmem+exmem_free)
     
+    
     MODE=MODE+".LIVE"
+    total_size = (max_memory[0]['Normal']+max_memory[1]['Normal']+max_memory[2]['Normal']+max_memory[0]['DMA']+max_memory[0]['DMA32'])
+    total_normals_size = (max_memory[0]['Normal']+max_memory[1]['Normal']+max_memory[0]['DMA']+max_memory[0]['DMA32'])
+    used_normal_and_cxl = ram_percent*total_size/100
+    used_normals_memory = used_normal_and_cxl - used_exmem
+    # print('[INFO] Used_DRAM',used_normals_memory/1024,'GB',100*used_normals_memory/total_normals_size,'%')
+    # print('[INFO] Used_CXL_MEM',used_exmem/1024,'GB')
+    # print('[INFO] Used_CXL_PMEM',pmem_used/1024,'GB')
+    ram_percent = np.round(100*used_normals_memory/total_normals_size,1)
     string = f"{current_time},{idx},{cpu_percent},{ram_percent},{gpu_percent},{gpumem_percent},{cxl_percent},{pci_tx},{pci_rx},{product},{product_gen},{gpumem_used},{gpumem_total},{pmem_used},{performance_state},{gpu_temperature},{MODE}"
     print(string,file=open(f'online/{name}-gpu-{idx}.csv', 'a'))
     print(string)
 
 def get_mode_info(text):
     mode_list = ['cxl-sim','cxl','disk','memverge','mem','mem1']
-    for mode in mode_list:
-        if mode in text:
-            return mode
+    return text.split()[-1]
         
     
         

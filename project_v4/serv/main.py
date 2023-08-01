@@ -28,11 +28,11 @@ def get_mode_info():
         with open(message_path, 'r') as file:
             my_mode = file.read().strip()
     mode_list = ['cxl-sim','cxl','disk','memverge','mem','mem1']
-    for mode in mode_list:
-        if mode in my_mode:
-            return mode
-
-
+    mode  =  my_mode.split()[-1]
+    my_mode = mode
+    print("[INFO] CURRENT MODE ===> ",my_mode)
+    return mode
+    
 
 def get_paths():
     global my_mode
@@ -209,4 +209,4 @@ def read_csv_data(filename):
 
 
 if __name__ == '__main__':
-    socketio.run(app,host='127.0.0.1', port=9980, debug=True)
+    socketio.run(app,host='127.0.0.1', port=9981, debug=True)
