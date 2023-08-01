@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+
+    <style>
+        .data-field {
+            font-size: 8px;
+            width: 700px;
+            height: 100px;
+        }
+    </style>
+
+
+	<script src="https://libs.baidu.com/jquery/2.1.4/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.0.0/socket.io.js"></script>
+</head>
+
+<body>
+    <div>
+        <h2>CXL HISTORY Data:</h2>
+        <div>
+        <button id="get_cxl_history_data">Get CXL History Data</button>
+        <textarea id="cxl_history_data" class="data-field" readonly></textarea>
+        </div>
+    </div>
+    <div>
+        <h2>CXL LIVE Data:</h2>
+        <div>
+        <button id="get_cxl_online_data">Get CXL Online Data</button>
+        <textarea id="cxl_online_data" class="data-field" readonly></textarea>
+        </div>
+    </div>  
+    <div>  
+        <h2>Disk HISTORY Data:</h2>
+        <div>
+        <button id="get_disk_history_data">Get Disk History Data</button>
+        <textarea id="disk_history_data" class="data-field" readonly></textarea>
+        </div>
+    </div>
+    <div>
+        <div>
+        <h2>Live Progress BAR Data:</h2>
+        <textarea id="live_progress_bar_value" class="data-field" readonly></textarea>
+        <button id="get_live_progress_bar_value">Get Live Progress Bar %Value</button>
+        </div>
+    </div>
+    <div>
+        <div>
+        <h2>CXL Throughput Data:</h2>
+        <textarea id="live_cxl_throughput_value" class="data-field" readonly></textarea>
+        <button id="get_live_cxl_throughput_value">Get Live CXL Throghput Value</button>
+        </div>
+    </div>
+
+    <div>
+        <div>
+        <h2>DISK Throughput Data:</h2>
+        <textarea id="disk_throughput_value" class="data-field" readonly></textarea>
+        <button id="get_disk_throughput_value">Get DISK Throghput Value</button>
+        </div>
+    </div>
+
+ 
+    <div>
+        <h2>LIVE CXL DATA AT ROW INDEX</h2>
+        <input type="number" id="request_value_online_cxl_row" placeholder="Enter index value">
+        <button id="send_request_for_row_cxl_online_data">Send Request</button>
+    </div>
+
+    <div>
+        <textarea id="result_field_cxl" class="data-field" readonly></textarea>
+    </div>
+
+    <div>
+        <h2>DISK DATA AT ROW INDEX</h2>
+        <input type="number" id="request_value_online_disk_row" placeholder="Enter index value">
+        <button id="send_request_for_row_disk_online_data">Send Request</button>
+    </div>
+
+    <div>
+        <textarea id="result_field_disk" class="data-field" readonly></textarea>
+    </div>
+  
+
+    <script type="text/javascript" charset="utf-8">
+        var socket = io.connect(window.location.protocol + '//' + document.domain + ':' + location.port);
+        var firstCxlRequestSent = false; // Track if the first CXL request is sent
+        var firstLiveProgressRequestSent = false;
+        var firstLiveCXLThroughputRequestSent = false;
+        socket.on('connect', function(){
+            console.log("Connected...!", socket.connected)
+        });
+
+        // Request HISTORY CXL data
+        $('#get_cxl_history_data').click(function() {
+            socket.emit('data_request', 'cxl_history');
+        });
+
+        // Request ONLINE CXL data
+        socket.emit('data_request', 'cxl_online'); // uncomment if you want no button press as page loads
+        $('#get_cxl_online_data').click(function() {
+            socket.emit('data_request', 'cxl_online');
+        });
+
+        // Request HISTORY Disk data
+        $('#get_disk_history_data').click(function() {
+            socket.emit('data_request', 'disk_history');
+        });
+
+        // Request live Progress data
+        socket.emit('data_request', 'live_progress_bar_value'); // uncomment if you want no button press as page loads
+        $('#get_live_progress_bar_value').click(function() {
+            socket.emit('data_request', 'live_progress_bar_value');
+        });
+
+        // Request Live CXL Throughput data
+        socket.emit('data_request', 'live_cxl_throughput_value'); // uncomment if you want no button press as page loads
+         $('#get_live_cxl_throughput_value').click(function() {
+            socket.emit('data_request', 'live_cxl_throughput_value');
+        });
+
+        // Request  DISK Throughput data
+          $('#get_disk_throughput_value').click(function() {
+            socket.emit('data_request', 'disk_throughput_value');
+        });
+
+
+          // Send request with a value
+        $('#send_request_for_row_cxl_online_data').click(function() {
+            var value = $('#request_value_online_cxl_row').val();
+            socket.emit('data_request', 'cxl_online_row', parseInt(value));
+        });
+
+         // Send request with a value
+         $('#send_request_for_row_disk_online_data').click(function() {
+            var value = $('#request_value_online_disk_row').val();
+            socket.emit('data_request', 'disk_online_row', parseInt(value));
+        });
+
+        socket.on('data_response', function(data_type, data) {
+            if (data_type === 'cxl_history') {
+                $('#cxl_history_data').val(data);
+            } 
+            
+            
+            else if (data_type === 'disk_history') {
+                $('#disk_history_data').val(data);
+            } 
+            
+            else if (data_type === 'cxl_online') {
+                if (!firstCxlRequestSent) {
+                    firstCxlRequestSent = true;
+                    setInterval(function() {
+                        socket.emit('data_request', 'cxl_online');
+                    }, 1000);
+                }
+                $('#cxl_online_data').val(data);
+            }
+            
+
+            else if (data_type === 'live_progress_bar_value'){
+                if (!firstLiveProgressRequestSent) {
+                    firstLiveProgressRequestSent = true;
+                    setInterval(function() {
+                        socket.emit('data_request', 'live_progress_bar_value');
+                    }, 1000);
+                }
+                $('#live_progress_bar_value').val(data);
+            }
+
+
+            else if (data_type === 'live_cxl_throughput_value') 
+
+            {
+                if (!firstLiveCXLThroughputRequestSent) {
+                    firstLiveCXLThroughputRequestSent = true;
+                    setInterval(function() {
+                        socket.emit('data_request', 'live_cxl_throughput_value');
+                    }, 1000);
+                }
+                $('#live_cxl_throughput_value').val(data);
+            }
+
+
+
+            else if (data_type === 'disk_throughput_value') {
+                $('#disk_throughput_value').val(data);
+            }
+            else if (data_type === 'cxl_online_row') {
+                $('#result_field_cxl').val(data);
+            }
+            else if (data_type === 'disk_online_row') {
+                $('#result_field_disk').val(data);
+            }
+            
+        });
+    </script>
+</body>
+</html>
