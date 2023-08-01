@@ -132,7 +132,7 @@ while [[ $# -gt 0 ]]; do
                 sudo $SCRIPT_PATH/stopmm.sh
                 $PYTHON mem_logger.py online_memverge.csv &
                 sudo $SCRIPT_PATH/startmm.sh
-                percentage=10
+                percentage=60 # set to 10 for giving 25GB almost from CXL
                 sudo /opt/memverge/bin/mm --config $SCRIPT_PATH/mvmalloc_configs/mvmalloc-${percentage}.yml $PYTHON flex_opt.py --model facebook/opt-66b --offload-dir tmp/data/flex_offload_dir --path _DUMMY_ --percent 0 100 0 100 0 100 --gpu-batch-size ${batch_size} --num-gpu-batches 4 --prompt-len 512 --gen-len 8 --compress-weight --compress-cache --log-file ${log_file}
                 echo "stop" > message.txt
                 
