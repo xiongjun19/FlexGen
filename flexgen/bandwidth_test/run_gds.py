@@ -1,5 +1,5 @@
 import csv, os
-os.system('python main_gpu_gds.py > gds.log')
+os.system('python main_gds_test_disk > gds.log')
 input_file = "gds.log"
 output_file = "output_gds.csv"
 

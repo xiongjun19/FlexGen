@@ -15,7 +15,8 @@ with open(output_file, 'w', newline='') as file:
     
     writer.writerow(['data_size_KB','device_id','device_type' ,'mem_type', 'memory_to_device_GB/s', 'device_to_memory_GB/s'])
 
-mem_type = ['mem0','mem1','cxl']
+mem_type = ['mem0','mem1','cxl'] # only use if cxl is there as numa node 2
+mem_type = ['mem0','mem1'] # use only if no cxl is there
 
 device_ids =[f"{i}" for i in range(8)]
 

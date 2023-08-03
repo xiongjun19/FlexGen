@@ -1,3 +1,7 @@
+Important:
+Before running the tests please do the following:
+`sudo chmod +x profile_test`
+
 To test GPU and Memory to/from bandwidth test run:
 `python main.py`
 To perform GPU and NVME to/from bandwidth run the following 
