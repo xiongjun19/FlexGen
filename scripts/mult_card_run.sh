@@ -16,12 +16,12 @@ mkdir -p ${cpu_logs}
 
 
 model_prefix="facebook"
-model_name_arr=("opt-175b")
+model_name_arr=("opt-66b")
 input_len_arr=(512)
 out_len_arr=(8)
-bs_arr=(20)
-num_bs_arr=(1)
-percent_arr=("0 100 0 100 0 100")
+bs_arr=(16)
+num_bs_arr=(2)
+percent_arr=("0 100 0 100 100 0")
 
 
 for(( i=0;i<${#model_name_arr[@]};i++)) do
@@ -49,29 +49,9 @@ for(( i=0;i<${#model_name_arr[@]};i++)) do
        --percent ${percent} \
        --comm-device cpu \
        --path _DUMMY_ \
-       --pin-weight 0 \
+       --pin-weight 1 \
        --num-gpu-batches ${num_bs}  --prompt-len ${input_len} --gen-len ${out_len} \
        --log-file ${cpu_log_org};
-   echo "start nsys";
-   nsys profile  -c cudaProfilerApi -f true --stats true  -o ${gpu_log} \
-     mpirun --allow-run-as-root \
-          --mca btl_tcp_if_exclude lo,docker0 \
-          --mca oob_tcp_if_exclude lo,docker0 \
-          --map-by ppr:$N_GPUS:node:pe=$N_CORES_PER_GPU --oversubscribe \
-          --bind-to core -x OMP_NUM_THREADS=$N_CORES_PER_GPU \
-          python dist_flex_opt_prof.py \
-            --head-ip 'localhost' \
-            --port 7777 \
-            --use-mpi \
-            --model ${model_path} \
-            --gpu-batch-size ${bs} \
-            --percent ${percent} \
-            --comm-device cpu \
-            --path _DUMMY_ \
-            --pin-weight 0 \
-            --num-gpu-batches ${num_bs}  --prompt-len ${input_len} --gen-len ${out_len} \
-            --cpu_log_path ${cpu_log};
-
    echo "done";
 done
 
