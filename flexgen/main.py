@@ -275,7 +275,7 @@ def get_p(tags,title, YLABEL, my_colors):
 
     color0,color1,color2,color3,color4 = my_colors[0],my_colors[1],my_colors[2],my_colors[3],my_colors[4]
 
-    p = figure(width=400, height=280)
+    p = figure(width=800, height=280)
     p.title.text = title
     p.x_range.follow="end"
     p.x_range.follow_interval = 100
