@@ -1,0 +1,6 @@
+data_size_KB,device_id,device_type,mem_type,memory_to_device_GB/s,device_to_memory_GB/s
+4.0,0,NVIDIA GeForce RTX 3060,cxl,0.229391,0.316832
+16.0,0,NVIDIA GeForce RTX 3060,cxl,0.761905,1.021956
+64.0,0,NVIDIA GeForce RTX 3060,cxl,1.830206,2.115703
+256.0,0,NVIDIA GeForce RTX 3060,cxl,2.862334,2.913229
+1024.0,0,NVIDIA GeForce RTX 3060,cxl,3.230921,3.243714

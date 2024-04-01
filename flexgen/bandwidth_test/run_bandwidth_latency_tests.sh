@@ -30,9 +30,9 @@ mkdir -p "$res_dir"
 getconf -a | grep PAGE_SIZE
 
 # Check whether the memory control group exists and create it if it doesn't
-if [ ! -d "/sys/fs/cgroup/memory/${CGROUP_NAME}" ]; then
-    cgcreate -a "$USER:$USER" -g memory:"${CGROUP_NAME}"
-fi
+# if [ ! -d "/sys/fs/cgroup/memory/${CGROUP_NAME}" ]; then
+#     cgcreate -a "$USER:$USER" -g memory:"${CGROUP_NAME}"
+# fi
 
 # Define a usage function
 function usage(){
@@ -46,9 +46,9 @@ CMD=''
 PORT=9808
 MODE=''
 # Calculate the memory limit in bytes based on the memory size
-CGROUP_MEM_BYTES=$((MEMSIZE_MB*1024**2))
+# CGROUP_MEM_BYTES=$((MEMSIZE_MB*1024**2))
 # Set the memory limit for the control group
-echo "${CGROUP_MEM_BYTES}" > "/sys/fs/cgroup/memory/${CGROUP_NAME}/memory.limit_in_bytes"
+# echo "${CGROUP_MEM_BYTES}" > "/sys/fs/cgroup/memory/${CGROUP_NAME}/memory.limit_in_bytes"
 
 # Parse command-line options
 while [[ $# -gt 0 ]]; do
@@ -62,7 +62,7 @@ while [[ $# -gt 0 ]]; do
                 echo "================================================="
                 echo "Protowave card CXL memory enumeration by OS "
                 echo "================================================="
-                cgexec -g memory:${CGROUP_NAME} lspci | grep CXL
+                lspci | grep CXL
                 
             fi
             shift
@@ -76,7 +76,7 @@ while [[ $# -gt 0 ]]; do
                 echo "================================================="
                 echo "Testing HPC operations Bandwidth for CXL "
                 echo "================================================="
-                cgexec -g memory:${CGROUP_NAME} numactl --cpunodebind=0  --membind=$MEM_SET $APP_STREAM -a 100000000
+                numactl --cpunodebind=0  --membind=$MEM_SET $APP_STREAM -a 100000000
                 
             fi
             shift
@@ -92,7 +92,7 @@ while [[ $# -gt 0 ]]; do
                 echo "Testing HPC operations Bandwidth for Mem0 "
                 echo "================================================="
                 MEM_SET=0
-                cgexec -g memory:${CGROUP_NAME} numactl --cpunodebind=0  --membind=$MEM_SET $APP_STREAM -a 100000000
+                numactl --cpunodebind=0  --membind=$MEM_SET $APP_STREAM -a 100000000
                 
             fi
             shift
@@ -107,7 +107,7 @@ while [[ $# -gt 0 ]]; do
                 echo "Testing HPC operations Bandwidth for Mem1 "
                 echo "================================================="
                 MEM_SET=1
-                cgexec -g memory:${CGROUP_NAME} numactl --cpunodebind=1  --membind=$MEM_SET $APP_STREAM -a 100000000
+                numactl --cpunodebind=1  --membind=$MEM_SET $APP_STREAM -a 100000000
                 
             fi
             shift
@@ -121,12 +121,12 @@ while [[ $# -gt 0 ]]; do
                 echo "==================================================="
                 echo "Testing Data transfer latency from Node 0#CPU to CXL"
                 echo "==================================================="
-                cgexec -g memory:${CGROUP_NAME} $APP_MLC --idle_latency -c0 -j2 -b1
-                cgexec -g memory:${CGROUP_NAME} $APP_MLC --idle_latency -c0 -j2 -b1m
-                cgexec -g memory:${CGROUP_NAME} $APP_MLC --idle_latency -c0 -j2 -b16m
-                cgexec -g memory:${CGROUP_NAME} $APP_MLC --idle_latency -c0 -j2 -b64m
-                cgexec -g memory:${CGROUP_NAME} $APP_MLC --idle_latency -c0 -j2 -b1g
-                cgexec -g memory:${CGROUP_NAME} $APP_MLC --idle_latency -c0 -j2 -b16g
+                $APP_MLC --idle_latency -c0 -j2 -b1
+                $APP_MLC --idle_latency -c0 -j2 -b1m
+                $APP_MLC --idle_latency -c0 -j2 -b16m
+                $APP_MLC --idle_latency -c0 -j2 -b64m
+                $APP_MLC --idle_latency -c0 -j2 -b1g
+                $APP_MLC --idle_latency -c0 -j2 -b16g
 
             fi
             shift
@@ -139,11 +139,11 @@ while [[ $# -gt 0 ]]; do
                 echo "================================================="
                 echo "Testing bandwidth for Numa Node 0 and CXL Node 2"
                 echo "================================================="
-                cgexec -g memory:${CGROUP_NAME} numactl --cpunodebind=0  --membind=$MEM_SET $APP_MLC --max_bandwidth -b200m
+                numactl --cpunodebind=0  --membind=$MEM_SET $APP_MLC --max_bandwidth -b200m
                 echo "================================================="
                 echo "Testing bandwidth for Numa Node 1 and CXL Node 2"
                 echo "================================================="
-                cgexec -g memory:${CGROUP_NAME} numactl --cpunodebind=1 --membind=$MEM_SET $APP_MLC  --max_bandwidth -b200m
+                numactl --cpunodebind=1 --membind=$MEM_SET $APP_MLC  --max_bandwidth -b200m
 
             fi
             shift
@@ -156,11 +156,11 @@ while [[ $# -gt 0 ]]; do
                 echo "================================================="
                 echo "Testing bandwidth for Numa Node 0 and Mem Node 0"
                 echo "================================================="
-                cgexec -g memory:${CGROUP_NAME} numactl --cpunodebind=0  --membind=$MEM_SET $APP_MLC --max_bandwidth -b200m
+                numactl --cpunodebind=0  --membind=$MEM_SET $APP_MLC --max_bandwidth -b200m
                 echo "================================================="
                 echo "Testing bandwidth for Numa Node 1 and Mem Node 0"
                 echo "================================================="
-                cgexec -g memory:${CGROUP_NAME} numactl --cpunodebind=1 --membind=$MEM_SET $APP_MLC  --max_bandwidth -b200m
+                numactl --cpunodebind=1 --membind=$MEM_SET $APP_MLC  --max_bandwidth -b200m
 
 
             fi
@@ -174,11 +174,11 @@ while [[ $# -gt 0 ]]; do
                 echo "================================================="
                 echo "Testing bandwidth for Numa Node 0 and Mem Node 1"
                 echo "================================================="
-                cgexec -g memory:${CGROUP_NAME} numactl --cpunodebind=0  --membind=$MEM_SET $APP_MLC --max_bandwidth -b200m
+                numactl --cpunodebind=0  --membind=$MEM_SET $APP_MLC --max_bandwidth -b200m
                 echo "================================================="
                 echo "Testing bandwidth for Numa Node 1 and Mem Node 1"
                 echo "================================================="
-                cgexec -g memory:${CGROUP_NAME} numactl --cpunodebind=1 --membind=$MEM_SET $APP_MLC  --max_bandwidth -b200m
+                numactl --cpunodebind=1 --membind=$MEM_SET $APP_MLC  --max_bandwidth -b200m
 
             fi
             shift
@@ -189,7 +189,7 @@ while [[ $# -gt 0 ]]; do
                 echo "================================================="
                 echo "Testing bandwidth for all nodes: Bandwidth Matrix"
                 echo "================================================="
-                cgexec -g memory:${CGROUP_NAME} $APP_MLC --bandwidth_matrix -W3 -b200m
+                $APP_MLC --bandwidth_matrix -W3 -b200m
             fi
             shift
             ;;
@@ -199,7 +199,7 @@ while [[ $# -gt 0 ]]; do
                 echo "================================================="
                 echo "Testing latency for all nodes: Latency Matrix"
                 echo "================================================="
-                cgexec -g memory:${CGROUP_NAME} $APP_MLC --latency_matrix -b200m
+                $APP_MLC --latency_matrix -b200m
             fi
             shift
             ;;
@@ -209,7 +209,7 @@ while [[ $# -gt 0 ]]; do
                 echo "================================================="
                 echo "Testing latency for all cpu cores: Latency Matrix"
                 echo "================================================="
-                cgexec -g memory:${CGROUP_NAME} $APP_MLC --latency_matrix -a -b200m
+                $APP_MLC --latency_matrix -a -b200m
             fi
             shift
             ;;

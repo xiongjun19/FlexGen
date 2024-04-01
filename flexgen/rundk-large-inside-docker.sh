@@ -2,7 +2,8 @@
 
 # Set the path to the Python executable
 PYTHON=/opt/conda/bin/python # use in Docker
-PYTHON=/home/ahussain/miniconda3/envs/ui38/bin/python # use outside docker
+
+# PYTHON=/home/ansible/miniconda3/envs/ui38/bin/python # use outside docker
 # Get the absolute path of the base directory (two levels up from the script's directory)
 readonly BASEDIR=$(readlink -f "$(dirname "$0")")/../../..
 
@@ -30,7 +31,7 @@ getconf -a | grep PAGE_SIZE
 
 
 directory="tmp"
-sudo rm -rf tmp
+ rm -rf tmp
 # Check if the directory exists
 if [ ! -d "$directory" ]; then
   echo "Creating $directory directory..."
@@ -53,16 +54,36 @@ MEM_SET=0
 CMD=''
 PORT=9808
 batch_size=24
-sudo service redis stop
-sudo rm -rf message.txt
-sudo chmod +x $SCRIPT_PATH/startmm.sh
-sudo chmod +x $SCRIPT_PATH/stopmm.sh
-echo "Check Memverge status..."
+# sudo service redis stop
+# sudo rm -rf message.txt
+# sudo chmod +x $SCRIPT_PATH/startmm.sh
+# sudo chmod +x $SCRIPT_PATH/stopmm.sh
+# echo "Check Memverge status..."
 
 # Following two steps are very important to stop the machine if it is already started.
 # The reason to add starmm.sh is to ensure a fail-safe mechanism to gracefully shutdown the mm.
-sudo $SCRIPT_PATH/startmm.sh 
-sudo $SCRIPT_PATH/stopmm.sh
+# sudo $SCRIPT_PATH/startmm.sh 
+# sudo $SCRIPT_PATH/stopmm.sh
+
+
+# Call the Python script and capture its output
+output=$($PYTHON get_cpu_cxl.py)
+# Extract the package number from the output
+package_number=$(echo "$output" | grep -o 'Package L#[0-9]*' | awk -F'#' '{print $2}')
+# Print the package number
+echo "CHECK: CXL connected to CPU Package Number: $package_number"
+
+if [ "$package_number" = "0" ]; then
+    nodeid=1
+elif [ "$package_number" = "1" ]; then
+    nodeid=0
+else
+    echo "Invalid package number"
+    exit 1
+fi
+
+# Print the nodeid
+echo "Using CPU NODE ID: $nodeid"
 
 # Parse command-line options
 while [[ $# -gt 0 ]]; do
@@ -75,7 +96,8 @@ while [[ $# -gt 0 ]]; do
                 echo "stop" > message.txt
                 echo "start cxl" > message.txt
                 $PYTHON mem_logger.py online_cxl.csv &
-                sudo numactl --interleave=$MEM_SET  $PYTHON flex_opt.py --model facebook/opt-66b --offload-dir /workspace/data/flex_offload_dir --path _DUMMY_ --percent 0 100 0 100 0 100 --gpu-batch-size ${batch_size} --num-gpu-batches 4 --prompt-len 512 --gen-len 8 --compress-weight --compress-cache --log-file ${log_file}
+                # Use Cross nodes, if CXL is on Socket0 then select --cpunodebind=1, and vice versa
+                numactl --membind=$MEM_SET --cpunodebind=${nodeid} $PYTHON flex_opt.py --model facebook/opt-66b --offload-dir /workspace/data/flex_offload_dir --path _DUMMY_ --percent 0 100 0 100 0 100 --gpu-batch-size ${batch_size} --num-gpu-batches 4 --prompt-len 512 --gen-len 8 --compress-weight --compress-cache --log-file ${log_file}
                 echo "stop" > message.txt
                 
             fi
@@ -179,7 +201,7 @@ while [[ $# -gt 0 ]]; do
                 echo "start mem" > message.txt
                 $PYTHON mem_logger.py online_mem.csv &
                 log_file='OPT-66b-MEM-OUTPUT.log'
-                sudo numactl --interleave=$MEM_SET $PYTHON flex_opt.py --model facebook/opt-66b --offload-dir tmp/data/flex_offload_dir --path _DUMMY_ --percent 0 100 0 100 0 100 --gpu-batch-size ${batch_size} --num-gpu-batches 4 --prompt-len 512 --gen-len 8 --compress-weight --compress-cache --log-file ${log_file}
+                numactl --interleave=$MEM_SET $PYTHON flex_opt.py --model facebook/opt-66b --offload-dir tmp/data/flex_offload_dir --path _DUMMY_ --percent 0 100 0 100 0 100 --gpu-batch-size ${batch_size} --num-gpu-batches 4 --prompt-len 512 --gen-len 8 --compress-weight --compress-cache --log-file ${log_file}
                 echo "stop" > message.txt
             fi
             shift
@@ -193,7 +215,7 @@ while [[ $# -gt 0 ]]; do
                 echo "start all" > message.txt
                 $PYTHON mem_logger.py online_all.csv &
                 log_file='OPT-66b-ALL-OUTPUT.log'
-                sudo numactl --interleave=0,1,2 $PYTHON flex_opt.py --model facebook/opt-66b --offload-dir tmp/data/flex_offload_dir --path _DUMMY_ --percent 0 100 0 100 0 100 --gpu-batch-size ${batch_size} --num-gpu-batches 4 --prompt-len 512 --gen-len 8 --compress-weight --compress-cache --log-file ${log_file}
+                numactl --interleave=0,1,2 $PYTHON flex_opt.py --model facebook/opt-66b --offload-dir tmp/data/flex_offload_dir --path _DUMMY_ --percent 0 100 0 100 0 100 --gpu-batch-size ${batch_size} --num-gpu-batches 4 --prompt-len 512 --gen-len 8 --compress-weight --compress-cache --log-file ${log_file}
                 echo "stop" > message.txt
             fi
             shift
@@ -207,7 +229,7 @@ while [[ $# -gt 0 ]]; do
                 echo "start mem1" > message.txt
                 $PYTHON mem_logger.py online_mem1.csv &
                 log_file='OPT-66b-MEM1-OUTPUT.log'
-                sudo numactl --interleave=$MEM_SET $PYTHON flex_opt.py --model facebook/opt-66b --offload-dir tmp/data/flex_offload_dir --path _DUMMY_ --percent 0 100 0 100 0 100 --gpu-batch-size ${batch_size} --num-gpu-batches 4 --prompt-len 512 --gen-len 8 --compress-weight --compress-cache --log-file ${log_file}
+                numactl --interleave=$MEM_SET $PYTHON flex_opt.py --model facebook/opt-66b --offload-dir tmp/data/flex_offload_dir --path _DUMMY_ --percent 0 100 0 100 0 100 --gpu-batch-size ${batch_size} --num-gpu-batches 4 --prompt-len 512 --gen-len 8 --compress-weight --compress-cache --log-file ${log_file}
                 echo "stop" > message.txt
             fi
             shift

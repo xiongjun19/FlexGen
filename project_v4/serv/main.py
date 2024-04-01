@@ -30,7 +30,7 @@ def get_mode_info():
     mode_list = ['cxl-sim','cxl','disk','memverge','mem','mem1','all']
     mode  =  my_mode.split()[-1]
     my_mode = mode
-    print("[INFO] CURRENT MODE ===> ",my_mode)
+    # print("[INFO] CURRENT MODE ===> ",my_mode)
     return mode
     
 
@@ -136,7 +136,7 @@ def handle_data_request(data_type,value=None):
         if percent>100:
             percent=100
         
-        print('MAX LENGTH',CXL_LENGTH)
+        # print('MAX LENGTH',CXL_LENGTH)
         data = {"live_progress_bar_value_%":percent}
         data = json.dumps(data)
         
@@ -173,7 +173,7 @@ def get_throughput_data(data_type,filepath):
     data_list = read_throughput_real(filepath)
     if data_type=='live_cxl_throughput_value':
         MAX_THROUGHPUT = max(data_list)+1
-    print(f'MAX_THROUPUT: ',MAX_THROUGHPUT)
+    # print(f'MAX_THROUPUT: ',MAX_THROUGHPUT)
     data = str(data_list[-1]) # to get the lastest decode throughput
     if MODE_SYNTHETIC:
         data_list = read_throughput(filepath)
@@ -209,4 +209,4 @@ def read_csv_data(filename):
 
 
 if __name__ == '__main__':
-    socketio.run(app,host='127.0.0.1', port=9981, debug=True)
+    socketio.run(app,host='0.0.0.0', port=9981, debug=True)
