@@ -21,16 +21,28 @@ MODE_SYNTHETIC = False
 CXL_LENGTH=0
 my_mode = 'cxl'
 
+def _get_flex_dir():
+    cur_dir, _ = os.path.split(__file__)
+    return os.path.join(cur_dir, os.pardir, os.pardir, "flexgen")
+
+def _get_ui_dir():
+    cur_dir, _ = os.path.split(__file__)
+    return os.path.join(cur_dir, os.pardir, os.pardir, "project_v4")
+
+
+glob_flex_dir = _get_flex_dir()
+glob_ui_dir = _get_ui_dir()
+
 def get_mode_info():
     global my_mode
-    message_path = '../../FlexGen/flexgen/message.txt'
+    message_path = f'{glob_flex_dir}/message.txt'
     if os.path.exists(message_path):
         with open(message_path, 'r') as file:
             my_mode = file.read().strip()
     mode_list = ['cxl-sim','cxl','disk','memverge','mem','mem1','all']
     mode  =  my_mode.split()[-1]
     my_mode = mode
-    # print("[INFO] CURRENT MODE ===> ",my_mode)
+    print("[INFO] CURRENT MODE ===> ",my_mode)
     return mode
     
 
@@ -46,12 +58,12 @@ def get_paths():
         MODE_UPPER = MODE.upper()
         
     # Actual One 
-    history_cxl_filepath=f'../../FlexGen/flexgen/history-21july-b24/online_{MODE}.csv-gpu-0.csv'
-    online_cxl_filepath=f'../../FlexGen/flexgen/online/online_{MODE}.csv-gpu-0.csv'
-    history_disk_filepath=f'../../FlexGen/flexgen/history-21july-b24/online_disk.csv-gpu-0.csv'
+    history_cxl_filepath=f'{glob_flex_dir}/history-21july-b24/online_{MODE}.csv-gpu-0.csv'
+    online_cxl_filepath=f'{glob_flex_dir}/online/online_{MODE}.csv-gpu-0.csv'
+    history_disk_filepath=f'{glob_flex_dir}/history-21july-b24/online_disk.csv-gpu-0.csv'
     
-    cxl_decode_throghput_filepath=f'../../FlexGen/flexgen/OPT-66b-{MODE_UPPER}-OUTPUT.log'
-    disk_decode_throghput_filepath=f'../../FlexGen/flexgen/OPT-66b-DISK-OUTPUT.log'
+    cxl_decode_throghput_filepath=f'{glob_flex_dir}/OPT-66b-{MODE_UPPER}-OUTPUT.log'
+    disk_decode_throghput_filepath=f'{glob_flex_dir}/OPT-66b-DISK-OUTPUT.log'
     
     return history_cxl_filepath,online_cxl_filepath,history_disk_filepath,cxl_decode_throghput_filepath,disk_decode_throghput_filepath
 
@@ -62,8 +74,8 @@ if MODE_SYNTHETIC=='synthetic':
     history_cxl_filepath='offline/history_cxl.csv'
     online_cxl_filepath='online/online_cxl.csv'
     history_disk_filepath='offline/history_disk.csv'
-    disk_decode_throghput_filepath='../../FlexGen/project_v4/decode_throughput/disk.log'
-    cxl_decode_throghput_filepath='../../FlexGen/project_v4/decode_throughput/cxl.log'
+    disk_decode_throghput_filepath=f'{glob_ui_dir}/decode_throughput/disk.log'
+    cxl_decode_throghput_filepath=f'{glob_ui_dir}/decode_throughput/cxl.log'
     
 
 def extract_all_decode_throughputs(log_file_path):
@@ -120,12 +132,14 @@ def handle_data_request(data_type,value=None):
     elif data_type == 'disk_history':
         _,_,history_disk_filepath,_,_ = get_paths()
         data = read_csv_data(history_disk_filepath)
+
     elif data_type == 'live_progress_bar_value':
         if flag_progress==False:
             history_cxl_filepath,_,_,_,_= get_paths()
             history_cxl_data = read_csv_data(history_cxl_filepath)
             CXL_LENGTH = len(history_cxl_data)
         _,online_cxl_filepath,_,_,_= get_paths()
+        print(online_cxl_filepath)
         cxl_data = read_csv_data(online_cxl_filepath)
         if flag_progress:
             if len(cxl_data) == previous_progress_data:
@@ -136,7 +150,7 @@ def handle_data_request(data_type,value=None):
         if percent>100:
             percent=100
         
-        # print('MAX LENGTH',CXL_LENGTH)
+        print('MAX LENGTH',CXL_LENGTH)
         data = {"live_progress_bar_value_%":percent}
         data = json.dumps(data)
         
@@ -173,7 +187,7 @@ def get_throughput_data(data_type,filepath):
     data_list = read_throughput_real(filepath)
     if data_type=='live_cxl_throughput_value':
         MAX_THROUGHPUT = max(data_list)+1
-    # print(f'MAX_THROUPUT: ',MAX_THROUGHPUT)
+    print(f'MAX_THROUPUT: ',MAX_THROUGHPUT)
     data = str(data_list[-1]) # to get the lastest decode throughput
     if MODE_SYNTHETIC:
         data_list = read_throughput(filepath)
@@ -209,4 +223,5 @@ def read_csv_data(filename):
 
 
 if __name__ == '__main__':
-    socketio.run(app,host='0.0.0.0', port=9981, debug=True)
+    # socketio.run(app,host='0.0.0.0', port=9981, debug=True)
+    socketio.run(app,host='0.0.0.0', port=9981, debug=False)

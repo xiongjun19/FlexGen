@@ -2,7 +2,7 @@
 
 
 # Set the number of iterations (use -1 for infinite loop)
-COUNT=10
+COUNT=30
 
 # Function to run the rundk-large.sh script
 run_script() {
