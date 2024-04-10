@@ -64,6 +64,25 @@ echo "Check Memverge status..."
 # sudo $SCRIPT_PATH/startmm.sh 
 # sudo $SCRIPT_PATH/stopmm.sh
 
+# Call the Python script and capture its output
+output=$($PYTHON get_cpu_cxl.py)
+# Extract the package number from the output
+package_number=$(echo "$output" | grep -o 'Package L#[0-9]*' | awk -F'#' '{print $2}')
+# Print the package number
+echo "CHECK: CXL connected to CPU Package Number: $package_number"
+
+if [ "$package_number" = "0" ]; then
+    nodeid=1
+elif [ "$package_number" = "1" ]; then
+    nodeid=0
+else
+    echo "Invalid package number"
+    exit 1
+fi
+
+# Print the nodeid
+echo "Using CPU NODE ID: $nodeid"
+
 # Parse command-line options
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -75,7 +94,9 @@ while [[ $# -gt 0 ]]; do
                 echo "stop" > message.txt
                 echo "start cxl" > message.txt
                 $PYTHON mem_logger.py online_cxl.csv &
-                sudo numactl --interleave=$MEM_SET --cpunodebind=0  $PYTHON flex_opt.py --model facebook/opt-66b --offload-dir /workspace/data/flex_offload_dir --path _DUMMY_ --percent 0 100 0 100 0 100 --gpu-batch-size ${batch_size} --num-gpu-batches 4 --prompt-len 512 --gen-len 8 --compress-weight --compress-cache --log-file ${log_file}
+                # sudo numactl --interleave=$MEM_SET --cpunodebind=0  $PYTHON flex_opt.py --model facebook/opt-66b --offload-dir /workspace/data/flex_offload_dir --path _DUMMY_ --percent 0 100 0 100 0 100 --gpu-batch-size ${batch_size} --num-gpu-batches 4 --prompt-len 512 --gen-len 8 --compress-weight --compress-cache --log-file ${log_file}
+                # Use Cross nodes, if CXL is on Socket0 then select --cpunodebind=1, and vice versa
+                sudo numactl --membind=$MEM_SET --cpunodebind=${nodeid} $PYTHON flex_opt.py --model facebook/opt-66b --offload-dir /workspace/data/flex_offload_dir --path _DUMMY_ --percent 0 100 0 100 0 100 --gpu-batch-size ${batch_size} --num-gpu-batches 4 --prompt-len 512 --gen-len 8 --compress-weight --compress-cache --log-file ${log_file}
                 echo "stop" > message.txt
                 
             fi
