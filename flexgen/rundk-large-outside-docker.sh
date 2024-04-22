@@ -53,11 +53,11 @@ MEM_SET=0
 CMD=''
 PORT=9808
 batch_size=24
-sudo service redis stop
+# sudo service redis stop
 sudo rm -rf message.txt
-sudo chmod +x $SCRIPT_PATH/startmm.sh
-sudo chmod +x $SCRIPT_PATH/stopmm.sh
-echo "Check Memverge status..."
+# sudo chmod +x $SCRIPT_PATH/startmm.sh
+# sudo chmod +x $SCRIPT_PATH/stopmm.sh
+# echo "Check Memverge status..."
 
 # Following two steps are very important to stop the machine if it is already started.
 # The reason to add starmm.sh is to ensure a fail-safe mechanism to gracefully shutdown the mm.
@@ -65,7 +65,7 @@ echo "Check Memverge status..."
 # sudo $SCRIPT_PATH/stopmm.sh
 
 # Call the Python script and capture its output
-output=$($PYTHON get_cpu_cxl.py)
+output=$( $PYTHON get_cpu_cxl.py)
 # Extract the package number from the output
 package_number=$(echo "$output" | grep -o 'Package L#[0-9]*' | awk -F'#' '{print $2}')
 # Print the package number
@@ -94,9 +94,27 @@ while [[ $# -gt 0 ]]; do
                 echo "stop" > message.txt
                 echo "start cxl" > message.txt
                 $PYTHON mem_logger.py online_cxl.csv &
-                # sudo numactl --interleave=$MEM_SET --cpunodebind=0  $PYTHON flex_opt.py --model facebook/opt-66b --offload-dir /workspace/data/flex_offload_dir --path _DUMMY_ --percent 0 100 0 100 0 100 --gpu-batch-size ${batch_size} --num-gpu-batches 4 --prompt-len 512 --gen-len 8 --compress-weight --compress-cache --log-file ${log_file}
+                
                 # Use Cross nodes, if CXL is on Socket0 then select --cpunodebind=1, and vice versa
                 sudo numactl --membind=$MEM_SET --cpunodebind=${nodeid} $PYTHON flex_opt.py --model facebook/opt-66b --offload-dir /workspace/data/flex_offload_dir --path _DUMMY_ --percent 0 100 0 100 0 100 --gpu-batch-size ${batch_size} --num-gpu-batches 4 --prompt-len 512 --gen-len 8 --compress-weight --compress-cache --log-file ${log_file}
+              
+                echo "stop" > message.txt
+                
+            fi
+            shift
+            ;;
+        --cxl-offload-interleave)
+            if [ $MEM_SET -eq 0 ]; then
+                MEMTYPE=cxl
+                MEM_SET=2
+                log_file='OPT-66b-CXL-OUTPUT.log'
+                echo "stop" > message.txt
+                echo "start cxl" > message.txt
+                $PYTHON mem_logger.py online_cxl.csv &
+                
+                # Use Cross nodes, if CXL is on Socket0 then select --cpunodebind=1, and vice versa
+                sudo numactl --interleave=0,2 --cpunodebind=${nodeid} $PYTHON flex_opt.py --model facebook/opt-66b --offload-dir /workspace/data/flex_offload_dir --path _DUMMY_ --percent 0 100 0 100 0 100 --gpu-batch-size ${batch_size} --num-gpu-batches 4 --prompt-len 512 --gen-len 8 --compress-weight --compress-cache --log-file ${log_file}
+              
                 echo "stop" > message.txt
                 
             fi

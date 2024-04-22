@@ -20,6 +20,7 @@ MAX_THROUGHPUT = 6 # IMPORTANT TO SHOW CIRCULAR PROGRESS INITIAL, BUT WILL BE AU
 MODE_SYNTHETIC = False
 CXL_LENGTH=0
 my_mode = 'cxl'
+HISTORY_DIR = 'history-22april-b24' # history-21july-b24
 
 def _get_flex_dir():
     cur_dir, _ = os.path.split(__file__)
@@ -58,9 +59,9 @@ def get_paths():
         MODE_UPPER = MODE.upper()
         
     # Actual One 
-    history_cxl_filepath=f'{glob_flex_dir}/history-21july-b24/online_{MODE}.csv-gpu-0.csv'
+    history_cxl_filepath=f'{glob_flex_dir}/{HISTORY_DIR}/online_{MODE}.csv-gpu-0.csv'
     online_cxl_filepath=f'{glob_flex_dir}/online/online_{MODE}.csv-gpu-0.csv'
-    history_disk_filepath=f'{glob_flex_dir}/history-21july-b24/online_disk.csv-gpu-0.csv'
+    history_disk_filepath=f'{glob_flex_dir}/{HISTORY_DIR}/online_disk.csv-gpu-0.csv'
     
     cxl_decode_throghput_filepath=f'{glob_flex_dir}/OPT-66b-{MODE_UPPER}-OUTPUT.log'
     disk_decode_throghput_filepath=f'{glob_flex_dir}/OPT-66b-DISK-OUTPUT.log'

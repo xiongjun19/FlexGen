@@ -25,4 +25,5 @@ plt.title('Details of MEM (NORMAL MEMORY) OPT-66B INFERENCE Values Over Time')
 plt.legend(loc='upper left')
 
 plt.tight_layout()
-plt.show()
+# plt.show()
+plt.savefig('outme.png')

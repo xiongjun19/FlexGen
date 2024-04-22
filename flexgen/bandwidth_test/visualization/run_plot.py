@@ -14,9 +14,9 @@ def moving_average(data, window_size):
 # disk_df = pd.read_csv('disk.csv')
 # memverge_df = pd.read_csv('output.csv')
 
-mem_df = pd.read_csv('A10-12july/normal-b24.csv')
-cxl_df = pd.read_csv('A10-12july/cxl-b24.csv')
-disk_df = pd.read_csv('A10-12july/disk-b24-50perc.csv')
+mem_df = pd.read_csv('/home/ansible/demo/FlexGen/flexgen/online/online_mem.csv-gpu-0.csv')
+cxl_df = pd.read_csv('/home/ansible/demo/FlexGen/flexgen/online/online_cxl.csv-gpu-0.csv')
+disk_df = pd.read_csv('/home/ansible/demo/FlexGen/flexgen/online/online_disk.csv-gpu-0.csv')
 # memverge_df = pd.read_csv('A10-12july/memverge-b24.csv')
 
 # Electric blue: "#00FFFF"
@@ -33,7 +33,7 @@ disk_df = pd.read_csv('A10-12july/disk-b24-50perc.csv')
 
 def plot_me(key):
     # Apply moving average filter
-    window_size = 30
+    window_size = 10
     colors = ['#FF4136', '#2ECC40', '#0074D9',"#FFA500"]
     # Extract the GPU utilization columns
     util_mem =  moving_average(mem_df[key],window_size)
@@ -94,13 +94,13 @@ if __name__=='__main__':
     GPU_INFO = mem_df['PRODUCT'][0]
     
     CXL_TOTAL_SIZE_GB = 128 # please update manually for SERVER CXL memory
-    TOTAL_SERVER_MEM_SIZE_GB = 378 # please update manually for SERVER TOTAL memory= Normal0+Normal1+CXL
+    TOTAL_SERVER_MEM_SIZE_GB = 598 # please update manually for SERVER TOTAL memory= Normal0+Normal1+CXL
     if GPU_INFO=='NVIDIA A10':
         GPUMEM_TOTAL_GB = 24
     else: 
         assert 0, "Please check GPU MODEL and its enter Max GPUMEM_TOTAL_GB"
    
-    fig = plt.figure(figsize=(12, 16),facecolor='black')
+    fig = plt.figure(figsize=(16, 12),facecolor='black')
     plt.style.use('dark_background')
     fig.add_subplot(4,2,1)
     plot_me('CPU%')
@@ -126,4 +126,5 @@ if __name__=='__main__':
                         wspace=0.2, 
                         hspace=0.55)
 
-    plt.show()    
+    # plt.show()    
+    plt.savefig('perf_results.png')
