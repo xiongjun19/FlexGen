@@ -209,7 +209,14 @@ def get_traces(idx,MODE = 'CXL'):
     
     
     MODE=MODE+".LIVE"
-    total_size = (max_memory[0]['Normal']+max_memory[1]['Normal']+max_memory[2]['Normal']+max_memory[0]['DMA']+max_memory[0]['DMA32'])
+    
+    if len(max_memory[2]) !=0:
+        print('INFO: CXL NUMA NODE 2 FOUND!!')
+        total_size = (max_memory[0]['Normal']+max_memory[1]['Normal']+max_memory[2]['Normal']+max_memory[0]['DMA']+max_memory[0]['DMA32'])
+    else:
+        print('INFO: CXL NUMA NODE NOT FOUND!')
+        total_size = (max_memory[0]['Normal']+max_memory[1]['Normal']+max_memory[0]['DMA']+max_memory[0]['DMA32'])
+
     total_normals_size = (max_memory[0]['Normal']+max_memory[1]['Normal']+max_memory[0]['DMA']+max_memory[0]['DMA32'])
     used_normal_and_cxl = ram_percent*total_size/100
     used_normals_memory = used_normal_and_cxl - used_exmem
