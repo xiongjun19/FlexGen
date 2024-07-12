@@ -28,8 +28,8 @@ flexgen/apps/data_wrangle/core
 
 # log files
 *.tsv
-*.log
 *.raw
 
 # tmp scripts
 today_job.sh
+flexgen/tmp/

@@ -18,7 +18,7 @@ current_user=$(whoami)
 RESULTS_DIR=./results
 system=$1
 
-MODEL='facebook/opt-13b' # 'facebook/opt-66b' 'facebook/opt-30b'
+MODEL='facebook/opt-30b' # 'facebook/opt-66b' 'facebook/opt-30b'
 # Set the results directory
 res_dir=${RESULTS_DIR}
 
