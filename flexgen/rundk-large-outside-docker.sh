@@ -18,7 +18,7 @@ current_user=$(whoami)
 RESULTS_DIR=./results
 system=$1
 
-MODEL='--model=facebook/opt-1.3b'
+MODEL='facebook/opt-13b' # 'facebook/opt-66b' 'facebook/opt-30b'
 # Set the results directory
 res_dir=${RESULTS_DIR}
 
@@ -30,7 +30,7 @@ getconf -a | grep PAGE_SIZE
 
 
 directory="tmp"
-sudo rm -rf tmp
+rm -rf tmp
 # Check if the directory exists
 if [ ! -d "$directory" ]; then
   echo "Creating $directory directory..."
@@ -54,7 +54,7 @@ CMD=''
 PORT=9808
 batch_size=24
 # sudo service redis stop
-sudo rm -rf message.txt
+rm -rf message.txt
 # sudo chmod +x $SCRIPT_PATH/startmm.sh
 # sudo chmod +x $SCRIPT_PATH/stopmm.sh
 # echo "Check Memverge status..."
@@ -98,7 +98,7 @@ while [[ $# -gt 0 ]]; do
                 $PYTHON mem_logger.py online_cxl.csv &
                 
                 # Use Cross nodes, if CXL is on Socket0 then select --cpunodebind=1, and vice versa
-                sudo numactl --membind=$MEM_SET --cpunodebind=${nodeid} $PYTHON flex_opt.py --model facebook/opt-66b --offload-dir /workspace/data/flex_offload_dir --path _DUMMY_ --percent 0 100 0 100 0 100 --gpu-batch-size ${batch_size} --num-gpu-batches 4 --prompt-len 512 --gen-len 8 --compress-weight --compress-cache --log-file ${log_file}
+                sudo numactl --membind=$MEM_SET --cpunodebind=${nodeid} $PYTHON flex_opt.py --model $MODEL --offload-dir /workspace/data/flex_offload_dir --path _DUMMY_ --percent 0 100 0 100 0 100 --gpu-batch-size ${batch_size} --num-gpu-batches 4 --prompt-len 512 --gen-len 8 --compress-weight --compress-cache --log-file ${log_file}
               
                 echo "stop" > message.txt
                 
@@ -115,7 +115,7 @@ while [[ $# -gt 0 ]]; do
                 $PYTHON mem_logger.py online_cxl.csv &
                 
                 # Use Cross nodes, if CXL is on Socket0 then select --cpunodebind=1, and vice versa
-                sudo numactl --interleave=0,2 --cpunodebind=${nodeid} $PYTHON flex_opt.py --model facebook/opt-66b --offload-dir /workspace/data/flex_offload_dir --path _DUMMY_ --percent 0 100 0 100 0 100 --gpu-batch-size ${batch_size} --num-gpu-batches 4 --prompt-len 512 --gen-len 8 --compress-weight --compress-cache --log-file ${log_file}
+                sudo numactl --interleave=0,2 --cpunodebind=${nodeid} $PYTHON flex_opt.py --model $MODEL --offload-dir /workspace/data/flex_offload_dir --path _DUMMY_ --percent 0 100 0 100 0 100 --gpu-batch-size ${batch_size} --num-gpu-batches 4 --prompt-len 512 --gen-len 8 --compress-weight --compress-cache --log-file ${log_file}
               
                 echo "stop" > message.txt
                 
@@ -156,7 +156,7 @@ while [[ $# -gt 0 ]]; do
                 echo "stop" > message.txt
                 echo "start cxl-sim" > message.txt
                 $PYTHON mem_logger.py online_cxl-sim.csv &
-                sudo cgexec -g memory:${CGROUP_NAME} numactl --interleave=$MEM_SET  $PYTHON flex_opt.py --model facebook/opt-66b --offload-dir /workspace/data/flex_offload_dir --path _DUMMY_ --percent 0 100 0 100 0 100 --gpu-batch-size ${batch_size} --num-gpu-batches 4 --prompt-len 512 --gen-len 8 --compress-weight --compress-cache --log-file ${log_file}
+                sudo cgexec -g memory:${CGROUP_NAME} numactl --interleave=$MEM_SET  $PYTHON flex_opt.py --model $MODEL --offload-dir /workspace/data/flex_offload_dir --path _DUMMY_ --percent 0 100 0 100 0 100 --gpu-batch-size ${batch_size} --num-gpu-batches 4 --prompt-len 512 --gen-len 8 --compress-weight --compress-cache --log-file ${log_file}
                 echo "stop" > message.txt
                 
             fi
@@ -174,7 +174,7 @@ while [[ $# -gt 0 ]]; do
                 $PYTHON mem_logger.py online_memverge.csv &
                 sudo $SCRIPT_PATH/startmm.sh
                 percentage=60 # set to 10 for giving 25GB almost from CXL
-                sudo /opt/memverge/bin/mm --config $SCRIPT_PATH/mvmalloc_configs/mvmalloc-${percentage}.yml $PYTHON flex_opt.py --model facebook/opt-66b --offload-dir tmp/data/flex_offload_dir --path _DUMMY_ --percent 0 100 0 100 0 100 --gpu-batch-size ${batch_size} --num-gpu-batches 4 --prompt-len 512 --gen-len 8 --compress-weight --compress-cache --log-file ${log_file}
+                sudo /opt/memverge/bin/mm --config $SCRIPT_PATH/mvmalloc_configs/mvmalloc-${percentage}.yml $PYTHON flex_opt.py --model $MODEL --offload-dir tmp/data/flex_offload_dir --path _DUMMY_ --percent 0 100 0 100 0 100 --gpu-batch-size ${batch_size} --num-gpu-batches 4 --prompt-len 512 --gen-len 8 --compress-weight --compress-cache --log-file ${log_file}
                 echo "stop" > message.txt
                 
                 
@@ -201,7 +201,7 @@ while [[ $# -gt 0 ]]; do
                 sudo $SCRIPT_PATH/stopmm.sh
                 sudo $SCRIPT_PATH/startmm.sh
                 echo "[INFO] Starting Local Memory Percentage as ${percentage} % ..."
-                sudo /opt/memverge/bin/mm --config $SCRIPT_PATH/mvmalloc_configs/mvmalloc-${percentage}.yml $PYTHON flex_opt.py --model facebook/opt-66b --offload-dir tmp/data/flex_offload_dir --path _DUMMY_ --percent 0 100 0 100 0 100 --gpu-batch-size "${batch_size}" --num-gpu-batches 4 --prompt-len 512 --gen-len 8 --compress-weight --compress-cache --log-file "${log_file}"
+                sudo /opt/memverge/bin/mm --config $SCRIPT_PATH/mvmalloc_configs/mvmalloc-${percentage}.yml $PYTHON flex_opt.py --model $MODEL --offload-dir tmp/data/flex_offload_dir --path _DUMMY_ --percent 0 100 0 100 0 100 --gpu-batch-size "${batch_size}" --num-gpu-batches 4 --prompt-len 512 --gen-len 8 --compress-weight --compress-cache --log-file "${log_file}"
                 echo "stop" > message.txt
                 sudo $SCRIPT_PATH/stopmm.sh
                 
@@ -220,7 +220,7 @@ while [[ $# -gt 0 ]]; do
                 echo "start mem" > message.txt
                 $PYTHON mem_logger.py online_mem.csv &
                 log_file='OPT-66b-MEM-OUTPUT.log'
-                sudo numactl --interleave=$MEM_SET $PYTHON flex_opt.py --model facebook/opt-66b --offload-dir tmp/data/flex_offload_dir --path _DUMMY_ --percent 0 100 0 100 0 100 --gpu-batch-size ${batch_size} --num-gpu-batches 4 --prompt-len 512 --gen-len 8 --compress-weight --compress-cache --log-file ${log_file}
+                numactl --interleave=$MEM_SET $PYTHON flex_opt.py --model $MODEL --offload-dir tmp/data/flex_offload_dir --path _DUMMY_ --percent 0 100 0 100 0 100 --gpu-batch-size ${batch_size} --num-gpu-batches 4 --prompt-len 512 --gen-len 8 --compress-weight --compress-cache --log-file ${log_file}
                 echo "stop" > message.txt
             fi
             shift
@@ -234,7 +234,7 @@ while [[ $# -gt 0 ]]; do
                 echo "start all" > message.txt
                 $PYTHON mem_logger.py online_all.csv &
                 log_file='OPT-66b-ALL-OUTPUT.log'
-                sudo numactl --interleave=0,1,2 $PYTHON flex_opt.py --model facebook/opt-66b --offload-dir tmp/data/flex_offload_dir --path _DUMMY_ --percent 0 100 0 100 0 100 --gpu-batch-size ${batch_size} --num-gpu-batches 4 --prompt-len 512 --gen-len 8 --compress-weight --compress-cache --log-file ${log_file}
+                sudo numactl --interleave=0,1,2 $PYTHON flex_opt.py --model $MODEL --offload-dir tmp/data/flex_offload_dir --path _DUMMY_ --percent 0 100 0 100 0 100 --gpu-batch-size ${batch_size} --num-gpu-batches 4 --prompt-len 512 --gen-len 8 --compress-weight --compress-cache --log-file ${log_file}
                 echo "stop" > message.txt
             fi
             shift
@@ -248,7 +248,7 @@ while [[ $# -gt 0 ]]; do
                 echo "start mem1" > message.txt
                 $PYTHON mem_logger.py online_mem1.csv &
                 log_file='OPT-66b-MEM1-OUTPUT.log'
-                sudo numactl --interleave=$MEM_SET $PYTHON flex_opt.py --model facebook/opt-66b --offload-dir tmp/data/flex_offload_dir --path _DUMMY_ --percent 0 100 0 100 0 100 --gpu-batch-size ${batch_size} --num-gpu-batches 4 --prompt-len 512 --gen-len 8 --compress-weight --compress-cache --log-file ${log_file}
+                sudo numactl --interleave=$MEM_SET $PYTHON flex_opt.py --model $MODEL --offload-dir tmp/data/flex_offload_dir --path _DUMMY_ --percent 0 100 0 100 0 100 --gpu-batch-size ${batch_size} --num-gpu-batches 4 --prompt-len 512 --gen-len 8 --compress-weight --compress-cache --log-file ${log_file}
                 echo "stop" > message.txt
             fi
             shift
@@ -280,7 +280,7 @@ while [[ $# -gt 0 ]]; do
                 echo "start disk" > message.txt
                 $PYTHON mem_logger.py online_disk.csv &
                 log_file='OPT-66b-DISK-OUTPUT.log'
-                sudo cgexec -g memory:${CGROUP_NAME} $PYTHON flex_opt.py --model facebook/opt-66b --offload-dir tmp/data/flex_offload_dir --path _DUMMY_ --percent 0 0 0 0 0 100 --gpu-batch-size ${batch_size} --num-gpu-batches 4 --prompt-len 512 --gen-len 8 --compress-weight --compress-cache --log-file ${log_file}
+                sudo cgexec -g memory:${CGROUP_NAME} $PYTHON flex_opt.py --model $MODEL --offload-dir tmp/data/flex_offload_dir --path _DUMMY_ --percent 0 0 0 0 0 100 --gpu-batch-size ${batch_size} --num-gpu-batches 4 --prompt-len 512 --gen-len 8 --compress-weight --compress-cache --log-file ${log_file}
                 echo "stop" > message.txt
             fi
             shift
