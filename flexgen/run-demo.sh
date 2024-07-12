@@ -6,8 +6,8 @@ COUNT=-1
 
 # Function to run the rundk-large.sh script
 run_script() {
-    ./rundk-large-inside-docker.sh --cxl-offload
-    # ./rundk-large-outside-docker.sh --cxl-offload
+    # ./rundk-large-inside-docker.sh --cxl-offload
+    ./rundk-large-outside-docker.sh --cxl-offload
 }
 
 # Infinite while loop when COUNT is -1, or run COUNT times

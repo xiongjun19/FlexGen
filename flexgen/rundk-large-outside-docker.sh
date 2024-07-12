@@ -18,7 +18,7 @@ current_user=$(whoami)
 RESULTS_DIR=./results
 system=$1
 
-MODEL='facebook/opt-30b' # 'facebook/opt-66b' 'facebook/opt-30b'
+MODEL='facebook/opt-13b' # 'facebook/opt-13b' 'facebook/opt-66b' 'facebook/opt-30b'
 # Set the results directory
 res_dir=${RESULTS_DIR}
 
@@ -30,7 +30,7 @@ getconf -a | grep PAGE_SIZE
 
 
 directory="tmp"
-rm -rf tmp
+sudo rm -rf tmp
 # Check if the directory exists
 if [ ! -d "$directory" ]; then
   echo "Creating $directory directory..."
