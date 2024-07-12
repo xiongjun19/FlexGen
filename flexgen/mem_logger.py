@@ -118,9 +118,10 @@ def update():
         dma_free = memory_info[(0,'DMA')]
         dma32_free = memory_info[(0,'DMA32')]
         normal_free = memory_info[(0,'Normal')]
-
-        normal1_free = memory_info[(1,'Normal')]
-        used_normal1 = max_memory[1]['Normal'] -  normal1_free
+        
+        if (1,'Normal') in memory_info:
+            normal1_free = memory_info[(1,'Normal')]
+            used_normal1 = max_memory[1]['Normal'] -  normal1_free
 
         if (2,'Normal') in memory_info:
             exmem_free = memory_info[(2,'Normal')]
@@ -190,9 +191,9 @@ def get_traces(idx,MODE = 'CXL'):
     dma_free = memory_info[(0,'DMA')]
     dma32_free = memory_info[(0,'DMA32')]
     normal_free = memory_info[(0,'Normal')]
-
-    normal1_free = memory_info[(1,'Normal')]
-    used_normal1 = max_memory[1]['Normal'] -  normal1_free
+    if (1,'Normal') in memory_info:
+        normal1_free = memory_info[(1,'Normal')]
+        used_normal1 = max_memory[1]['Normal'] -  normal1_free
 
     if (2,'Normal') in memory_info:
         exmem_free = memory_info[(2,'Normal')]
@@ -213,11 +214,17 @@ def get_traces(idx,MODE = 'CXL'):
     if len(max_memory[2]) !=0:
         print('INFO: CXL NUMA NODE 2 FOUND!!')
         total_size = (max_memory[0]['Normal']+max_memory[1]['Normal']+max_memory[2]['Normal']+max_memory[0]['DMA']+max_memory[0]['DMA32'])
+        total_normals_size = (max_memory[0]['Normal']+max_memory[1]['Normal']+max_memory[0]['DMA']+max_memory[0]['DMA32'])
     else:
         print('INFO: CXL NUMA NODE NOT FOUND!')
-        total_size = (max_memory[0]['Normal']+max_memory[1]['Normal']+max_memory[0]['DMA']+max_memory[0]['DMA32'])
-
-    total_normals_size = (max_memory[0]['Normal']+max_memory[1]['Normal']+max_memory[0]['DMA']+max_memory[0]['DMA32'])
+        
+        if len(max_memory[1])!=0:
+            total_size = (max_memory[0]['Normal']+max_memory[1]['Normal']+max_memory[0]['DMA']+max_memory[0]['DMA32'])
+            total_normals_size = (max_memory[0]['Normal']+max_memory[1]['Normal']+max_memory[0]['DMA']+max_memory[0]['DMA32'])
+        else:
+            total_size = (max_memory[0]['Normal']+max_memory[0]['DMA']+max_memory[0]['DMA32'])
+            total_normals_size = (max_memory[0]['Normal']+max_memory[0]['DMA']+max_memory[0]['DMA32'])
+    
     used_normal_and_cxl = ram_percent*total_size/100
     used_normals_memory = used_normal_and_cxl - used_exmem
     # print('[INFO] Used_DRAM',used_normals_memory/1024,'GB',100*used_normals_memory/total_normals_size,'%')

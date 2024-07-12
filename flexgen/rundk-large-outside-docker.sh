@@ -2,7 +2,7 @@
 
 # Set the path to the Python executable
 PYTHON=/opt/conda/bin/python # use in Docker
-PYTHON=/home/ansible/miniconda3/envs/ui38/bin/python # use outside docker
+PYTHON=~/miniconda3/envs/ui38/bin/python # use outside docker
 # Get the absolute path of the base directory (two levels up from the script's directory)
 readonly BASEDIR=$(readlink -f "$(dirname "$0")")/../../..
 
