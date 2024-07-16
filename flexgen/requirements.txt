@@ -1,5 +1,5 @@
 numpy
 bokeh
-pynvml
+pynvml==11.4.0
 tabulate
 psutil
